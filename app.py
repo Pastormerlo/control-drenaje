@@ -2,14 +2,10 @@ from flask import Flask, render_template, request, redirect
 import sqlite3
 import os
 
-# Configuración de rutas absoluta para evitar el Error 500 en Render
 base_dir = os.path.abspath(os.path.dirname(__file__))
+app = Flask(__name__, template_folder=os.path.join(base_dir, 'templates'))
 
-app = Flask(__name__, 
-            template_folder=os.path.join(base_dir, 'templates'))
-
-# Guardamos la DB en la carpeta /tmp de Render para asegurar permisos de escritura
-# (Recuerda que esto es temporal y se borra al reiniciar)
+# Ruta a la base de datos
 DB = os.path.join(base_dir, "drenaje.db")
 
 def conectar():
@@ -17,21 +13,20 @@ def conectar():
     con.row_factory = sqlite3.Row
     return con
 
+# Esta función se ejecuta automáticamente antes de procesar cualquier página
+@app.before_request
 def inicializar_db():
-    try:
-        with conectar() as con:
-            con.execute("""
-                CREATE TABLE IF NOT EXISTS registros (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    fecha TEXT,
-                    hora TEXT,
-                    cantidad_izq INTEGER,
-                    cantidad_der INTEGER,
-                    observaciones TEXT
-                )
-            """)
-    except Exception as e:
-        print(f"Error inicializando DB: {e}")
+    with conectar() as con:
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS registros (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fecha TEXT,
+                hora TEXT,
+                cantidad_izq INTEGER,
+                cantidad_der INTEGER,
+                observaciones TEXT
+            )
+        """)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -50,15 +45,12 @@ def index():
             """, (fecha, hora, izq, der, observaciones))
         return redirect("/")
 
-    try:
-        con = conectar()
-        registros = con.execute("SELECT * FROM registros ORDER BY fecha DESC, hora DESC").fetchall()
-        con.close()
-        return render_template("index.html", registros=registros)
-    except Exception as e:
-        return f"Error en el servidor: {str(e)}"
+    # Si la tabla no existe por algún motivo, el before_request ya la habrá creado aquí
+    con = conectar()
+    registros = con.execute("SELECT * FROM registros ORDER BY fecha DESC, hora DESC").fetchall()
+    con.close()
+    return render_template("index.html", registros=registros)
 
 if __name__ == "__main__":
-    inicializar_db()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
