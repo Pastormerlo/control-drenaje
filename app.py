@@ -13,6 +13,7 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
+            # La tabla se mantiene fija para no perder datos
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY,
