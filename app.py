@@ -13,9 +13,7 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
-            # La línea del DROP permanece comentada para proteger tus datos
             # cur.execute("DROP TABLE IF EXISTS registros CASCADE")
-            
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY,
@@ -33,14 +31,12 @@ def index():
     if request.method == "POST":
         fecha = request.form["fecha"]
         hora = request.form["hora"]
-        
         try:
             izq = float(request.form["cantidad_izq"].replace(',', '.'))
             der = float(request.form["cantidad_der"].replace(',', '.'))
         except ValueError:
             izq = 0.0
             der = 0.0
-            
         observaciones = request.form["observaciones"]
 
         with conectar() as con:
