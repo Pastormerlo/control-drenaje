@@ -8,7 +8,7 @@
     <style>
         .btn-delete { color: #dc3545; text-decoration: none; font-weight: bold; font-size: 1.2rem; }
         .texto-rojo { color: #dc3545; font-weight: bold; }
-        .card-grafico { min-height: 300px; }
+        .card-grafico { height: 350px; }
     </style>
 </head>
 <body class="bg-light">
@@ -37,7 +37,7 @@
     </form>
 
     <div class="card mb-4 shadow-sm p-2 card-grafico">
-        <h6 class="text-center text-muted">Evolución de Drenajes (ml)</h6>
+        <h6 class="text-center text-muted">Evolución (Últimos registros)</h6>
         <canvas id="graficoBarras"></canvas>
     </div>
 
@@ -61,19 +61,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // Fecha y hora auto
     window.onload = function() {
         const ahora = new Date();
         document.getElementById('f_auto').value = ahora.toISOString().split('T')[0];
         document.getElementById('h_auto').value = ahora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
     }
 
-    // Gráfico de Barras
-    const etiquetas = [{% for r in registros|reverse %}"{{ r.fecha }} {{ r.hora }}"{% if not loop.last %}, {% endif %}{% endfor %}];
-    const dIzq = [{% for r in registros|reverse %}{{ r.cant_izq }}{% if not loop.last %}, {% endif %}{% endfor %}];
-    const dDer = [{% for r in registros|reverse %}{{ r.cant_der }}{% if not loop.last %}, {% endif %}{% endfor %}];
+    // Datos del gráfico (limitamos a los últimos 10 para que no crezca de más)
+    const etiquetas = [{% for r in registros|reverse %}"{{ r.fecha }}"{% if not loop.last %}, {% endif %}{% endfor %}].slice(-10);
+    const dIzq = [{% for r in registros|reverse %}{{ r.cant_izq }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-10);
+    const dDer = [{% for r in registros|reverse %}{{ r.cant_der }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-10);
 
-    new Chart(document.getElementById('graficoBarras'), {
+    const ctx = document.getElementById('graficoBarras');
+    new Chart(ctx, {
         type: 'bar',
         data: {
             labels: etiquetas,
@@ -85,7 +85,12 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { y: { beginAtZero: true } }
+            scales: { 
+                y: { 
+                    beginAtZero: true,
+                    suggestedMax: 10 
+                } 
+            }
         }
     });
 </script>
