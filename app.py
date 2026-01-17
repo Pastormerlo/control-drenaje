@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, url_for
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
@@ -13,8 +13,7 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
-            # Esta línea borra la tabla vieja para que se cree con FLOAT (decimales)
-            # Solo la necesitamos para esta limpieza, luego la comentaremos
+            # La línea del DROP permanece comentada para proteger tus datos
             # cur.execute("DROP TABLE IF EXISTS registros CASCADE")
             
             cur.execute("""
@@ -35,7 +34,6 @@ def index():
         fecha = request.form["fecha"]
         hora = request.form["hora"]
         
-        # Convertimos a número con decimales (float)
         try:
             izq = float(request.form["cantidad_izq"].replace(',', '.'))
             der = float(request.form["cantidad_der"].replace(',', '.'))
@@ -53,16 +51,23 @@ def index():
                     VALUES (%s, %s, %s, %s, %s)
                 """, (fecha, hora, izq, der, observaciones))
             con.commit()
-        return redirect("/")
+        return redirect(url_for('index'))
 
     con = conectar()
     cur = con.cursor(cursor_factory=RealDictCursor)
-    # Buscamos los datos con los nombres exactos del HTML
-    cur.execute("SELECT fecha, hora, cant_izq, cant_der, observaciones FROM registros ORDER BY fecha DESC, hora DESC")
+    cur.execute("SELECT id, fecha, hora, cant_izq, cant_der, observaciones FROM registros ORDER BY fecha DESC, hora DESC")
     registros = cur.fetchall()
     cur.close()
     con.close()
     return render_template("index.html", registros=registros)
+
+@app.route("/borrar/<int:id>")
+def borrar(id):
+    with conectar() as con:
+        with con.cursor() as cur:
+            cur.execute("DELETE FROM registros WHERE id = %s", (id,))
+        con.commit()
+    return redirect(url_for('index'))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
