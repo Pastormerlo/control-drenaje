@@ -13,7 +13,9 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
-            # Agregamos la columna 'quien' si no existe
+            # ESTA ES LA LÍNEA QUE TENÉS QUE AGREGAR PARA REPARAR EL ERROR:
+            cur.execute("DROP TABLE IF EXISTS registros CASCADE")
+            
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY,
