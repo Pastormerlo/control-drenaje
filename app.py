@@ -15,7 +15,7 @@ def inicializar_db():
         with con.cursor() as cur:
             # Esta línea borra la tabla vieja para que se cree con FLOAT (decimales)
             # Solo la necesitamos para esta limpieza, luego la comentaremos
-            cur.execute("DROP TABLE IF EXISTS registros CASCADE")
+            # cur.execute("DROP TABLE IF EXISTS registros CASCADE")
             
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros (
