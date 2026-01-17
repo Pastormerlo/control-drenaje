@@ -13,9 +13,8 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
-            # ESTA ES LA LÍNEA QUE TENÉS QUE AGREGAR PARA REPARAR EL ERROR:
+            # Forzamos el reinicio para asegurar que la columna 'quien' exista
             cur.execute("DROP TABLE IF EXISTS registros CASCADE")
-            
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY,
@@ -32,24 +31,26 @@ def inicializar_db():
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        fecha = request.form["fecha"]
-        hora = request.form["hora"]
-        quien = request.form.get("quien", "No especificado")
+        # Recogemos los datos con los nombres exactos del HTML
+        fecha = request.form.get("fecha")
+        hora = request.form.get("hora")
+        quien = request.form.get("quien")
+        izq_raw = request.form.get("cantidad_izq")
+        der_raw = request.form.get("cantidad_der")
+        obs = request.form.get("observaciones")
+
         try:
-            izq = float(request.form["cantidad_izq"].replace(',', '.'))
-            der = float(request.form["cantidad_der"].replace(',', '.'))
-        except ValueError:
-            izq = 0.0
-            der = 0.0
-        observaciones = request.form["observaciones"]
+            izq = float(izq_raw.replace(',', '.')) if izq_raw else 0.0
+            der = float(der_raw.replace(',', '.')) if der_raw else 0.0
+        except:
+            izq, der = 0.0, 0.0
 
         with conectar() as con:
             with con.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO registros 
-                    (fecha, hora, cant_izq, cant_der, observaciones, quien)
+                    INSERT INTO registros (fecha, hora, cant_izq, cant_der, observaciones, quien)
                     VALUES (%s, %s, %s, %s, %s, %s)
-                """, (fecha, hora, izq, der, observaciones, quien))
+                """, (fecha, hora, izq, der, obs, quien))
             con.commit()
         return redirect(url_for('index'))
 
