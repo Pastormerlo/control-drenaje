@@ -28,20 +28,24 @@
             </div>
         </div>
         <label class="form-label mt-2 small">💧 Drenaje izquierdo (ml)</label>
-        <input type="number" name="cantidad_izq" step="0.01" class="form-control" placeholder="0.75" required>
+        <input type="number" name="cantidad_izq" step="0.01" class="form-control" placeholder="Ej: 75" required>
         <label class="form-label mt-2 small">💧 Drenaje derecho (ml)</label>
-        <input type="number" name="cantidad_der" step="0.01" class="form-control" placeholder="0.75" required>
+        <input type="number" name="cantidad_der" step="0.01" class="form-control" placeholder="Ej: 75" required>
         <label class="form-label mt-2 small">Observaciones</label>
         <textarea name="observaciones" class="form-control" rows="2"></textarea>
         <button class="btn btn-primary mt-3 w-100 fw-bold">Guardar registro</button>
     </form>
 
     <div class="card mb-4 shadow-sm p-2 card-grafico">
-        <h6 class="text-center text-muted">Evolución Diaria (ml)</h6>
+        <h6 class="text-center text-muted">Evolución de Drenajes (ml)</h6>
         <canvas id="graficoBarras"></canvas>
     </div>
 
-    <h5>📋 Historial</h5>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5>📋 Historial</h5>
+        <button onclick="exportarExcel()" class="btn btn-success btn-sm fw-bold">📊 Descargar Excel</button>
+    </div>
+
     <div class="list-group shadow-sm mb-5">
         {% for r in registros %}
         <div class="list-group-item">
@@ -60,6 +64,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
 <script>
     window.onload = function() {
         const ahora = new Date();
@@ -67,7 +73,7 @@
         document.getElementById('h_auto').value = ahora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
     }
 
-    // Datos: últimos 7 días
+    // Lógica del Gráfico
     const etiquetas = [{% for r in registros|reverse %}"{{ r.fecha }}"{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
     const dIzq = [{% for r in registros|reverse %}{{ r.cant_izq }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
     const dDer = [{% for r in registros|reverse %}{{ r.cant_der }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
@@ -77,21 +83,36 @@
         data: {
             labels: etiquetas,
             datasets: [
-                { label: 'Izq (ml)', data: dIzq, backgroundColor: '#0d6efd', borderRadius: 5 },
-                { label: 'Der (ml)', data: dDer, backgroundColor: '#dc3545', borderRadius: 5 }
+                { label: 'Izq (ml)', data: dIzq, backgroundColor: '#0d6efd' },
+                { label: 'Der (ml)', data: dDer, backgroundColor: '#dc3545' }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                y: { 
-                    beginAtZero: true,
-                    title: { display: true, text: 'Mililitros' }
-                }
-            }
+            scales: { y: { beginAtZero: true } }
         }
     });
+
+    // Lógica para Exportar a Excel
+    function exportarExcel() {
+        // Preparamos los datos desde el historial de registros
+        const datos = [
+            ["Fecha", "Hora", "Izq (ml)", "Der (ml)", "Observaciones"] // Encabezados
+        ];
+        
+        {% for r in registros %}
+        datos.push(["{{ r.fecha }}", "{{ r.hora }}", {{ r.cant_izq }}, {{ r.cant_der }}, "{{ r.observaciones }}"]);
+        {% endfor %}
+
+        // Creamos el libro de Excel
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(datos);
+        XLSX.utils.book_append_sheet(wb, ws, "Drenajes");
+
+        // Descargamos el archivo
+        XLSX.writeFile(wb, "Control_Drenaje_Bully.xlsx");
+    }
 </script>
 </body>
 </html>
