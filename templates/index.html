@@ -8,7 +8,7 @@
     <style>
         .btn-delete { color: #dc3545; text-decoration: none; font-weight: bold; font-size: 1.2rem; }
         .texto-rojo { color: #dc3545; font-weight: bold; }
-        .card-grafico { height: 400px; }
+        .card-grafico { height: 350px; }
     </style>
 </head>
 <body class="bg-light">
@@ -37,7 +37,7 @@
     </form>
 
     <div class="card mb-4 shadow-sm p-2 card-grafico">
-        <h6 class="text-center text-muted">Evolución Comparativa (ml)</h6>
+        <h6 class="text-center text-muted">Evolución Diaria (ml)</h6>
         <canvas id="graficoBarras"></canvas>
     </div>
 
@@ -67,6 +67,7 @@
         document.getElementById('h_auto').value = ahora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
     }
 
+    // Datos: últimos 7 días
     const etiquetas = [{% for r in registros|reverse %}"{{ r.fecha }}"{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
     const dIzq = [{% for r in registros|reverse %}{{ r.cant_izq }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
     const dDer = [{% for r in registros|reverse %}{{ r.cant_der }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
@@ -76,16 +77,18 @@
         data: {
             labels: etiquetas,
             datasets: [
-                { label: 'Izq (ml)', data: dIzq, backgroundColor: '#0d6efd', yAxisID: 'y' },
-                { label: 'Der (ml)', data: dDer, backgroundColor: '#dc3545', yAxisID: 'y1' }
+                { label: 'Izq (ml)', data: dIzq, backgroundColor: '#0d6efd', borderRadius: 5 },
+                { label: 'Der (ml)', data: dDer, backgroundColor: '#dc3545', borderRadius: 5 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: { type: 'linear', position: 'left', title: { display: true, text: 'Izq' } },
-                y1: { type: 'linear', position: 'right', title: { display: true, text: 'Der' }, grid: { drawOnChartArea: false } }
+                y: { 
+                    beginAtZero: true,
+                    title: { display: true, text: 'Mililitros' }
+                }
             }
         }
     });
