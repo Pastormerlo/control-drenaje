@@ -38,20 +38,24 @@
         <label class="form-label mt-2 small">Observaciones</label>
         <textarea name="observaciones" class="form-control" rows="2"></textarea>
         
-        <button type="submit" class="btn btn-primary mt-3 w-100 fw-bold">GUARDAR AHORA</button>
+        <button type="submit" class="btn btn-primary mt-3 w-100 fw-bold">GUARDAR REGISTRO</button>
     </form>
 
     <div class="card mb-4 shadow-sm p-2 card-grafico">
         <canvas id="graficoBarras"></canvas>
     </div>
 
-    <h5>📋 Historial</h5>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5>📋 Historial</h5>
+        <button onclick="exportarExcel()" class="btn btn-success btn-sm fw-bold">📊 Descargar Excel</button>
+    </div>
+
     <div class="list-group mb-5">
         {% for r in registros %}
         <div class="list-group-item">
             <div class="d-flex justify-content-between">
-                <span class="small text-muted">{{ r.fecha }} {{ r.hora }}</span>
-                <a href="/borrar/{{ r.id }}" class="text-danger fw-bold text-decoration-none">✖</a>
+                <span class="small text-muted">{{ r.fecha }} — {{ r.hora }}</span>
+                <a href="/borrar/{{ r.id }}" class="text-danger fw-bold text-decoration-none" onclick="return confirm('¿Borrar?')">✖</a>
             </div>
             <div class="mt-1">
                 <span class="texto-rojo">I: {{ r.cant_izq }} ml</span> | <span class="texto-rojo">D: {{ r.cant_der }} ml</span>
@@ -66,18 +70,26 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
 <script>
     window.onload = function() {
+        // Auto fecha y hora
         const ahora = new Date();
         document.getElementById('f_auto').value = ahora.toISOString().split('T')[0];
         document.getElementById('h_auto').value = ahora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        
+        // Cargar último nombre guardado
         const uNom = localStorage.getItem('uNom');
         if (uNom) document.getElementById('quien_input').value = uNom;
     }
+
+    // Guardar nombre al enviar
     document.getElementById('drainForm').onsubmit = function() {
         localStorage.setItem('uNom', document.getElementById('quien_input').value);
     };
 
+    // Configuración del Gráfico
     const etiquetas = [{% for r in registros|reverse %}"{{ r.fecha }}"{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
     const dIzq = [{% for r in registros|reverse %}{{ r.cant_izq }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
     const dDer = [{% for r in registros|reverse %}{{ r.cant_der }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
@@ -87,12 +99,30 @@
         data: {
             labels: etiquetas,
             datasets: [
-                { label: 'Izq', data: dIzq, backgroundColor: '#0d6efd' },
-                { label: 'Der', data: dDer, backgroundColor: '#dc3545' }
+                { label: 'Izq (ml)', data: dIzq, backgroundColor: '#0d6efd' },
+                { label: 'Der (ml)', data: dDer, backgroundColor: '#dc3545' }
             ]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } }
+        }
     });
+
+    // Función para Exportar a Excel
+    function exportarExcel() {
+        const datos = [["Fecha", "Hora", "Responsable", "Izq (ml)", "Der (ml)", "Observaciones"]];
+        
+        {% for r in registros %}
+        datos.push(["{{ r.fecha }}", "{{ r.hora }}", "{{ r.quien }}", {{ r.cant_izq }}, {{ r.cant_der }}, "{{ r.observaciones }}"]);
+        {% endfor %}
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(datos);
+        XLSX.utils.book_append_sheet(wb, ws, "Drenajes");
+        XLSX.writeFile(wb, "Control_Drenaje_Bully.xlsx");
+    }
 </script>
 </body>
 </html>
