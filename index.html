@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Control de Drenaje</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .btn-delete { color: #dc3545; text-decoration: none; font-weight: bold; font-size: 1.2rem; }
+        .texto-rojo { color: #dc3545; font-weight: bold; }
+        .card-grafico { height: 350px; }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container py-3">
+    <h3 class="text-center mb-3">🩺 Control de Drenaje</h3>
+
+    <form method="POST" class="card p-3 mb-4 shadow-sm">
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label small">Fecha</label>
+                <input type="date" name="fecha" id="f_auto" class="form-control" required>
+            </div>
+            <div class="col-6">
+                <label class="form-label small">Hora</label>
+                <input type="time" name="hora" id="h_auto" class="form-control" required>
+            </div>
+        </div>
+        <label class="form-label mt-2 small">💧 Drenaje izquierdo (ml)</label>
+        <input type="number" name="cantidad_izq" step="0.01" class="form-control" placeholder="0.75" required>
+        <label class="form-label mt-2 small">💧 Drenaje derecho (ml)</label>
+        <input type="number" name="cantidad_der" step="0.01" class="form-control" placeholder="0.75" required>
+        <label class="form-label mt-2 small">Observaciones</label>
+        <textarea name="observaciones" class="form-control" rows="2"></textarea>
+        <button class="btn btn-primary mt-3 w-100 fw-bold">Guardar registro</button>
+    </form>
+
+    <div class="card mb-4 shadow-sm p-2 card-grafico">
+        <h6 class="text-center text-muted">Evolución (Últimos registros)</h6>
+        <canvas id="graficoBarras"></canvas>
+    </div>
+
+    <h5>📋 Historial</h5>
+    <div class="list-group shadow-sm mb-5">
+        {% for r in registros %}
+        <div class="list-group-item">
+            <div class="d-flex w-100 justify-content-between align-items-center">
+                <span class="small text-muted">📅 {{ r.fecha }} — {{ r.hora }}</span>
+                <a href="/borrar/{{ r.id }}" class="btn-delete" onclick="return confirm('¿Borrar registro?')">✖</a>
+            </div>
+            <div class="mt-1">
+                <span class="texto-rojo">Izq: {{ r.cant_izq }} ml</span> | 
+                <span class="texto-rojo">Der: {{ r.cant_der }} ml</span>
+            </div>
+            {% if r.observaciones %}<small class="text-muted d-block mt-1">📝 {{ r.observaciones }}</small>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    window.onload = function() {
+        const ahora = new Date();
+        document.getElementById('f_auto').value = ahora.toISOString().split('T')[0];
+        document.getElementById('h_auto').value = ahora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Datos del gráfico (limitamos a los últimos 10 para que no crezca de más)
+    const etiquetas = [{% for r in registros|reverse %}"{{ r.fecha }}"{% if not loop.last %}, {% endif %}{% endfor %}].slice(-10);
+    const dIzq = [{% for r in registros|reverse %}{{ r.cant_izq }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-10);
+    const dDer = [{% for r in registros|reverse %}{{ r.cant_der }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-10);
+
+    const ctx = document.getElementById('graficoBarras');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: etiquetas,
+            datasets: [
+                { label: 'Izq', data: dIzq, backgroundColor: '#0d6efd' },
+                { label: 'Der', data: dDer, backgroundColor: '#dc3545' }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { 
+                y: { 
+                    beginAtZero: true,
+                    suggestedMax: 10 
+                } 
+            }
+        }
+    });
+</script>
+</body>
+</html>
