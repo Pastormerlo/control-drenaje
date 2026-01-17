@@ -4,8 +4,6 @@ from psycopg2.extras import RealDictCursor
 import os
 
 app = Flask(__name__)
-
-# Configuración de la base de datos desde la variable de entorno de Render
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def conectar():
@@ -15,11 +13,10 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
-            # 1. BORRAMOS LA TABLA VIEJA (Solo una vez para limpiar el error)
-            # Esta línea soluciona el problema de "UndefinedColumn" y el bloqueo de decimales
+            # Esta línea borra la tabla vieja para que se cree con FLOAT (decimales)
+            # Solo la necesitamos para esta limpieza, luego la comentaremos
             cur.execute("DROP TABLE IF EXISTS registros CASCADE")
             
-            # 2. CREAMOS LA TABLA NUEVA con soporte para decimales (FLOAT)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY,
@@ -38,7 +35,7 @@ def index():
         fecha = request.form["fecha"]
         hora = request.form["hora"]
         
-        # Recibimos los datos y reemplazamos la coma por punto para que Python no falle
+        # Convertimos a número con decimales (float)
         try:
             izq = float(request.form["cantidad_izq"].replace(',', '.'))
             der = float(request.form["cantidad_der"].replace(',', '.'))
@@ -58,17 +55,15 @@ def index():
             con.commit()
         return redirect("/")
 
-    # Consultamos los datos para mostrar en la tabla
     con = conectar()
     cur = con.cursor(cursor_factory=RealDictCursor)
+    # Buscamos los datos con los nombres exactos del HTML
     cur.execute("SELECT fecha, hora, cant_izq, cant_der, observaciones FROM registros ORDER BY fecha DESC, hora DESC")
     registros = cur.fetchall()
     cur.close()
     con.close()
-    
     return render_template("index.html", registros=registros)
 
 if __name__ == "__main__":
-    # Render usa un puerto dinámico, lo leemos de la variable de entorno
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
