@@ -9,27 +9,25 @@
 <body class="bg-light">
 
 <div class="container py-3">
-
     <h3 class="text-center mb-3">🩺 Control de Drenaje</h3>
 
     <form method="POST" class="card p-3 mb-4 shadow-sm">
-
         <div class="row g-2">
             <div class="col-6">
                 <label class="form-label">Fecha</label>
-                <input type="date" name="fecha" class="form-control" required>
+                <input type="date" name="fecha" id="f_auto" class="form-control" required>
             </div>
             <div class="col-6">
                 <label class="form-label">Hora</label>
-                <input type="time" name="hora" class="form-control" required>
+                <input type="time" name="hora" id="h_auto" class="form-control" required>
             </div>
         </div>
 
         <label class="form-label mt-2">💧 Drenaje izquierdo (ml)</label>
-        <input type="number" name="cantidad_izq" class="form-control" required>
+        <input type="number" name="cantidad_izq" step="0.01" class="form-control" placeholder="0.75" required>
 
         <label class="form-label mt-2">💧 Drenaje derecho (ml)</label>
-        <input type="number" name="cantidad_der" class="form-control" required>
+        <input type="number" name="cantidad_der" step="0.01" class="form-control" placeholder="0.75" required>
 
         <label class="form-label mt-2">Observaciones</label>
         <textarea name="observaciones" class="form-control" rows="2"></textarea>
@@ -42,14 +40,23 @@
     {% for r in registros %}
     <div class="card mb-2 shadow-sm">
         <div class="card-body p-2">
-            <strong>{{ r[1] }} {{ r[2] }}</strong><br>
-            💧 Izq: {{ r[3] }} ml — Der: {{ r[4] }} ml<br>
-            <small class="text-muted">{{ r[5] }}</small>
+            <strong>📅 {{ r.fecha }} — ⏰ {{ r.hora }}</strong><br>
+            <span class="text-primary">💧 Izq: <strong>{{ r.cant_izq }}</strong> ml</span> — 
+            <span class="text-primary">Der: <strong>{{ r.cant_der }}</strong> ml</span><br>
+            <small class="text-muted">{{ r.observaciones }}</small>
         </div>
     </div>
     {% endfor %}
-
 </div>
+
+<script>
+    // Esto te ahorra tiempo poniendo la fecha y hora actual
+    window.onload = function() {
+        const ahora = new Date();
+        document.getElementById('f_auto').value = ahora.toISOString().split('T')[0];
+        document.getElementById('h_auto').value = ahora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    }
+</script>
 
 </body>
 </html>
