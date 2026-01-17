@@ -13,14 +13,17 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
-            # Cambiamos INTEGER por FLOAT para permitir decimales
+            # ESTA LÍNEA ES LA MAGIA: Borra la tabla vieja para arreglar el error
+            # Solo la dejaremos para este deploy, luego la podemos sacar.
+            # cur.execute("DROP TABLE IF EXISTS registros CASCADE") 
+            
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY,
                     fecha TEXT,
                     hora TEXT,
-                    cantidad_izq FLOAT,
-                    cantidad_der FLOAT,
+                    cant_izq FLOAT,
+                    cant_der FLOAT,
                     observaciones TEXT
                 )
             """)
@@ -31,8 +34,6 @@ def index():
     if request.method == "POST":
         fecha = request.form["fecha"]
         hora = request.form["hora"]
-        # Usamos float() para convertir el texto a número decimal
-        # Reemplazamos la coma por punto por si escribes con coma
         izq = float(request.form["cantidad_izq"].replace(',', '.'))
         der = float(request.form["cantidad_der"].replace(',', '.'))
         observaciones = request.form["observaciones"]
@@ -41,7 +42,7 @@ def index():
             with con.cursor() as cur:
                 cur.execute("""
                     INSERT INTO registros 
-                    (fecha, hora, cantidad_izq, cantidad_der, observaciones)
+                    (fecha, hora, cant_izq, cant_der, observaciones)
                     VALUES (%s, %s, %s, %s, %s)
                 """, (fecha, hora, izq, der, observaciones))
             con.commit()
@@ -49,7 +50,7 @@ def index():
 
     con = conectar()
     cur = con.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT * FROM registros ORDER BY fecha DESC, hora DESC")
+    cur.execute("SELECT fecha, hora, cant_izq, cant_der, observaciones FROM registros ORDER BY fecha DESC, hora DESC")
     registros = cur.fetchall()
     cur.close()
     con.close()
