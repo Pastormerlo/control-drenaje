@@ -13,7 +13,7 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
-            # La tabla se mantiene fija para no perder datos
+            # Agregamos la columna 'quien' si no existe
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY,
@@ -21,7 +21,8 @@ def inicializar_db():
                     hora TEXT,
                     cant_izq FLOAT,
                     cant_der FLOAT,
-                    observaciones TEXT
+                    observaciones TEXT,
+                    quien TEXT
                 )
             """)
         con.commit()
@@ -31,6 +32,7 @@ def index():
     if request.method == "POST":
         fecha = request.form["fecha"]
         hora = request.form["hora"]
+        quien = request.form.get("quien", "No especificado")
         try:
             izq = float(request.form["cantidad_izq"].replace(',', '.'))
             der = float(request.form["cantidad_der"].replace(',', '.'))
@@ -43,15 +45,15 @@ def index():
             with con.cursor() as cur:
                 cur.execute("""
                     INSERT INTO registros 
-                    (fecha, hora, cant_izq, cant_der, observaciones)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (fecha, hora, izq, der, observaciones))
+                    (fecha, hora, cant_izq, cant_der, observaciones, quien)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (fecha, hora, izq, der, observaciones, quien))
             con.commit()
         return redirect(url_for('index'))
 
     con = conectar()
     cur = con.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT id, fecha, hora, cant_izq, cant_der, observaciones FROM registros ORDER BY fecha DESC, hora DESC")
+    cur.execute("SELECT * FROM registros ORDER BY fecha DESC, hora DESC")
     registros = cur.fetchall()
     cur.close()
     con.close()
