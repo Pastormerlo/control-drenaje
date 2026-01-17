@@ -9,6 +9,7 @@
         .btn-delete { color: #dc3545; text-decoration: none; font-weight: bold; font-size: 1.2rem; }
         .texto-rojo { color: #dc3545; font-weight: bold; }
         .card-grafico { height: 350px; }
+        .badge-user { background-color: #e9ecef; color: #495057; font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; }
     </style>
 </head>
 <body class="bg-light">
@@ -16,7 +17,7 @@
 <div class="container py-3">
     <h3 class="text-center mb-3">🩺 Control de Drenaje</h3>
 
-    <form method="POST" class="card p-3 mb-4 shadow-sm">
+    <form method="POST" class="card p-3 mb-4 shadow-sm" id="drainForm">
         <div class="row g-2">
             <div class="col-6">
                 <label class="form-label small">Fecha</label>
@@ -27,12 +28,19 @@
                 <input type="time" name="hora" id="h_auto" class="form-control" required>
             </div>
         </div>
+
+        <label class="form-label mt-2 small">👤 Ingresado por:</label>
+        <input type="text" name="quien" id="quien_input" class="form-control form-control-sm" placeholder="Tu nombre" required>
+
         <label class="form-label mt-2 small">💧 Drenaje izquierdo (ml)</label>
         <input type="number" name="cantidad_izq" step="0.01" class="form-control" placeholder="Ej: 75" required>
+        
         <label class="form-label mt-2 small">💧 Drenaje derecho (ml)</label>
         <input type="number" name="cantidad_der" step="0.01" class="form-control" placeholder="Ej: 75" required>
+
         <label class="form-label mt-2 small">Observaciones</label>
         <textarea name="observaciones" class="form-control" rows="2"></textarea>
+
         <button class="btn btn-primary mt-3 w-100 fw-bold">Guardar registro</button>
     </form>
 
@@ -43,7 +51,7 @@
 
     <div class="d-flex justify-content-between align-items-center mb-2">
         <h5>📋 Historial</h5>
-        <button onclick="exportarExcel()" class="btn btn-success btn-sm fw-bold">📊 Descargar Excel</button>
+        <button onclick="exportarExcel()" class="btn btn-success btn-sm fw-bold">📊 Excel</button>
     </div>
 
     <div class="list-group shadow-sm mb-5">
@@ -57,7 +65,10 @@
                 <span class="texto-rojo">Izq: {{ r.cant_izq }} ml</span> | 
                 <span class="texto-rojo">Der: {{ r.cant_der }} ml</span>
             </div>
-            {% if r.observaciones %}<small class="text-muted d-block mt-1">📝 {{ r.observaciones }}</small>{% endif %}
+            <div class="d-flex justify-content-between align-items-center mt-1">
+                {% if r.observaciones %}<small class="text-muted">📝 {{ r.observaciones }}</small>{% else %}<span></span>{% endif %}
+                <span class="badge-user">👤 {{ r.quien }}</span>
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -68,12 +79,24 @@
 
 <script>
     window.onload = function() {
+        // Auto fecha y hora
         const ahora = new Date();
         document.getElementById('f_auto').value = ahora.toISOString().split('T')[0];
         document.getElementById('h_auto').value = ahora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        
+        // Recordar nombre del usuario en el navegador
+        const ultimoNombre = localStorage.getItem('ultimoNombre');
+        if (ultimoNombre) {
+            document.getElementById('quien_input').value = ultimoNombre;
+        }
     }
 
-    // Lógica del Gráfico
+    // Al enviar el formulario, guardamos el nombre localmente
+    document.getElementById('drainForm').onsubmit = function() {
+        const nombre = document.getElementById('quien_input').value;
+        localStorage.setItem('ultimoNombre', nombre);
+    };
+
     const etiquetas = [{% for r in registros|reverse %}"{{ r.fecha }}"{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
     const dIzq = [{% for r in registros|reverse %}{{ r.cant_izq }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
     const dDer = [{% for r in registros|reverse %}{{ r.cant_der }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-7);
@@ -94,24 +117,15 @@
         }
     });
 
-    // Lógica para Exportar a Excel
     function exportarExcel() {
-        // Preparamos los datos desde el historial de registros
-        const datos = [
-            ["Fecha", "Hora", "Izq (ml)", "Der (ml)", "Observaciones"] // Encabezados
-        ];
-        
+        const datos = [["Fecha", "Hora", "Responsable", "Izq (ml)", "Der (ml)", "Observaciones"]];
         {% for r in registros %}
-        datos.push(["{{ r.fecha }}", "{{ r.hora }}", {{ r.cant_izq }}, {{ r.cant_der }}, "{{ r.observaciones }}"]);
+        datos.push(["{{ r.fecha }}", "{{ r.hora }}", "{{ r.quien }}", {{ r.cant_izq }}, {{ r.cant_der }}, "{{ r.observaciones }}"]);
         {% endfor %}
-
-        // Creamos el libro de Excel
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(datos);
         XLSX.utils.book_append_sheet(wb, ws, "Drenajes");
-
-        // Descargamos el archivo
-        XLSX.writeFile(wb, "Control_Drenaje_Bully.xlsx");
+        XLSX.writeFile(wb, "Control_Drenaje.xlsx");
     }
 </script>
 </body>
