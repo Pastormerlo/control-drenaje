@@ -13,10 +13,9 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
-            # Esta línea REPARA la base de datos. Déjala así hasta que funcione.
-            cur.execute("DROP TABLE IF EXISTS registros CASCADE")
+            # Creamos una tabla totalmente nueva para evitar conflictos de columnas
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS registros (
+                CREATE TABLE IF NOT EXISTS registros_v2 (
                     id SERIAL PRIMARY KEY,
                     fecha TEXT,
                     hora TEXT,
@@ -42,30 +41,30 @@ def index():
             with conectar() as con:
                 with con.cursor() as cur:
                     cur.execute("""
-                        INSERT INTO registros (fecha, hora, cant_izq, cant_der, observaciones, quien)
+                        INSERT INTO registros_v2 (fecha, hora, cant_izq, cant_der, observaciones, quien)
                         VALUES (%s, %s, %s, %s, %s, %s)
                     """, (fecha, hora, izq, der, obs, quien))
                 con.commit()
             return redirect(url_for('index'))
         except Exception as e:
-            return f"Error al guardar: {e}" # Esto nos dirá qué pasa si falla
+            return f"Error crítico al guardar: {e}"
 
     try:
         con = conectar()
         cur = con.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM registros ORDER BY fecha DESC, hora DESC")
+        cur.execute("SELECT * FROM registros_v2 ORDER BY fecha DESC, hora DESC")
         registros = cur.fetchall()
         cur.close()
         con.close()
         return render_template("index.html", registros=registros)
     except Exception as e:
-        return f"Error al cargar: {e}"
+        return f"Error al leer la base de datos: {e}"
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
     with conectar() as con:
         with con.cursor() as cur:
-            cur.execute("DELETE FROM registros WHERE id = %s", (id,))
+            cur.execute("DELETE FROM registros_v2 WHERE id = %s", (id,))
         con.commit()
     return redirect(url_for('index'))
 
