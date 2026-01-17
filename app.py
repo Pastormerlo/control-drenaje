@@ -13,7 +13,7 @@ def conectar():
 def inicializar_db():
     with conectar() as con:
         with con.cursor() as cur:
-            # cur.execute("DROP TABLE IF EXISTS registros CASCADE")
+            # La tabla ya existe, no la borramos
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY,
