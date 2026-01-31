@@ -6,8 +6,7 @@ import io
 from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
 
-# --- CONFIGURACIÓN DE RUTAS ABSOLUTAS ---
-# Esto soluciona el error TemplateNotFound en servidores Linux
+# --- CONFIGURACIÓN DE RUTAS ---
 base_dir = os.path.abspath(os.path.dirname(__file__))
 template_dir = os.path.join(base_dir, 'templates')
 
@@ -19,7 +18,6 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def conectar():
     url = DATABASE_URL
-    # Ajuste necesario para que SQLAlchemy/Psycopg2 acepten la URL de Render
     if url and url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
     
@@ -27,7 +25,7 @@ def conectar():
     return conn
 
 def init_db():
-    """Inicializa las tablas si no existen al arrancar la app."""
+    """Crea las tablas si no existen."""
     conn = conectar()
     cur = conn.cursor()
     cur.execute('''CREATE TABLE IF NOT EXISTS usuarios (
@@ -42,7 +40,16 @@ def init_db():
     cur.close()
     conn.close()
 
-# --- RUTAS DE ACCESO ---
+# --- ESTA ES LA MODIFICACIÓN CLAVE ---
+# Obliga a Flask a crear las tablas en Render apenas se inicia
+with app.app_context():
+    try:
+        init_db()
+        print("Tablas verificadas/creadas correctamente.")
+    except Exception as e:
+        print(f"Error al inicializar la base de datos: {e}")
+
+# --- RUTAS ---
 
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
@@ -52,6 +59,7 @@ def login():
         password = request.form.get("password")
         conn = conectar()
         cur = conn.cursor(cursor_factory=DictCursor)
+        # Aquí es donde antes fallaba porque la tabla no existía
         cur.execute("SELECT * FROM usuarios WHERE usuario = %s", (username,))
         user = cur.fetchone()
         cur.close()
@@ -86,8 +94,6 @@ def dashboard():
         return redirect(url_for("login"))
     return render_template("dashboard.html", usuario=session["usuario"])
 
-# --- RUTAS DE DRENAJE ---
-
 @app.route("/cargar", methods=["GET", "POST"])
 def cargar_registro():
     if "usuario" not in session:
@@ -119,8 +125,6 @@ def ver_registros():
     conn.close()
     return render_template("index.html", usuario=session["usuario"], registros=registros, modo="ver")
 
-# --- GENERACIÓN DE PDF ---
-
 @app.route("/descargar_pdf")
 def descargar_pdf():
     if "usuario" not in session:
@@ -136,8 +140,6 @@ def descargar_pdf():
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(190, 10, "Informe de Control de Drenaje", ln=True, align="C")
-    pdf.set_font("Helvetica", "", 12)
-    pdf.cell(190, 10, f"Usuario: {session['usuario']}", ln=True, align="C")
     pdf.ln(10)
 
     pdf.set_fill_color(200, 220, 255)
@@ -185,7 +187,5 @@ def logout():
     return redirect(url_for("login"))
 
 if __name__ == "__main__":
-    init_db()
-    # Render usa el puerto que le asigna el entorno
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
