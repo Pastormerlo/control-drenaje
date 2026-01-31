@@ -18,13 +18,11 @@ def conectar():
 def init_db():
     conn = conectar()
     cur = conn.cursor()
-    # Tabla de usuarios
     cur.execute('''CREATE TABLE IF NOT EXISTS usuarios (
                     id SERIAL PRIMARY KEY, 
                     usuario TEXT UNIQUE NOT NULL, 
                     password TEXT NOT NULL)''')
     
-    # Tabla de registros (con todas las columnas necesarias)
     cur.execute('''CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY, 
                     fecha TEXT, hora TEXT, 
@@ -34,7 +32,6 @@ def init_db():
                     glucosa INTEGER,
                     observaciones TEXT, usuario TEXT)''')
     
-    # Asegurar que las columnas existan por si la tabla es vieja
     columnas = [
         ("tipo", "TEXT DEFAULT 'drenaje'"),
         ("presion_alta", "INTEGER"),
