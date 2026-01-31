@@ -34,17 +34,13 @@ def init_db():
     
     columnas = [
         ("tipo", "TEXT DEFAULT 'drenaje'"),
-        ("presion_alta", "INTEGER"),
-        ("presion_baja", "INTEGER"),
-        ("pulso", "INTEGER"),
+        ("presion_alta", "INTEGER"), ("presion_baja", "INTEGER"), ("pulso", "INTEGER"),
         ("glucosa", "INTEGER")
     ]
     for col, tipo in columnas:
         try:
             cur.execute(f"ALTER TABLE registros ADD COLUMN IF NOT EXISTS {col} {tipo}")
-        except:
-            pass
-
+        except: pass
     conn.commit()
     cur.close()
     conn.close()
