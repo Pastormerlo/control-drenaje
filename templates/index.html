@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Salud - Mauro</title>
+    <title>Control Salud - Mauro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #f4f7f6; font-family: sans-serif; }
         .card { border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
-        .btn-custom { border-radius: 10px; padding: 12px; font-weight: bold; }
         .seccion-oculta { display: none; }
         .badge-drenaje { background-color: #0d6efd; color: white; padding: 5px 10px; border-radius: 5px; }
         .badge-presion { background-color: #dc3545; color: white; padding: 5px 10px; border-radius: 5px; }
@@ -19,7 +18,7 @@
 <body>
 
 <nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
-    <div class="container">
+    <div class="container d-flex justify-content-between">
         <span class="navbar-brand mb-0 h1">🏥 Control Médico</span>
         <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Salir</a>
     </div>
@@ -29,8 +28,8 @@
     <div class="row justify-content-center">
         <div class="col-md-8 text-center mb-4">
             <div class="btn-group w-100 shadow-sm">
-                <a href="{{ url_for('cargar_registro') }}" class="btn {% if modo == 'cargar' %}btn-primary{% else %}btn-outline-primary{% endif %}">Cargar Datos</a>
-                <a href="{{ url_for('ver_registros') }}" class="btn {% if modo == 'ver' %}btn-primary{% else %}btn-outline-primary{% endif %}">Ver Historial</a>
+                <a href="{{ url_for('cargar_registro') }}" class="btn {% if modo == 'cargar' %}btn-primary{% else %}btn-outline-primary{% endif %}">Cargar</a>
+                <a href="{{ url_for('ver_registros') }}" class="btn {% if modo == 'ver' %}btn-primary{% else %}btn-outline-primary{% endif %}">Historial</a>
             </div>
         </div>
 
@@ -44,7 +43,6 @@
                         <div class="col-6"><label class="form-label">Fecha</label><input type="date" name="fecha" id="f_act" class="form-control" required></div>
                         <div class="col-6"><label class="form-label">Hora</label><input type="time" name="hora" id="h_act" class="form-control" required></div>
                         <div class="col-12 mt-3">
-                            <label class="form-label fw-bold">Tipo de Control</label>
                             <select class="form-select form-select-lg" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
                                 <option value="drenaje">💧 Drenaje</option>
                                 <option value="presion">❤️ Presión / Pulso</option>
@@ -64,7 +62,7 @@
                             <div class="col-12"><label>Nivel (mg/dL)</label><input type="number" name="glucosa" class="form-control"></div>
                         </div>
                         <div class="col-12 mt-3"><label>Notas</label><textarea name="observaciones" class="form-control"></textarea></div>
-                        <button type="submit" class="btn btn-success btn-custom w-100 mt-4">💾 GUARDAR REGISTRO</button>
+                        <button type="submit" class="btn btn-success w-100 mt-4 py-3 fw-bold">💾 GUARDAR</button>
                     </div>
                 </form>
             </div>
@@ -73,42 +71,28 @@
 
         {% if modo == 'ver' %}
         <div class="col-md-10 text-center">
-            <div class="card p-3">
-                <h6>Drenaje: <span style="color:#0d6efd">Izq</span> / <span style="color:#dc3545">Der</span></h6>
-                <canvas id="chartDrenaje"></canvas>
-            </div>
-            
-            <div class="card p-3">
-                <h6>Presión (<span style="color:#dc3545">A</span>/<span style="color:#0d6efd">B</span>) y <span style="color:#198754">Pulso</span></h6>
-                <canvas id="chartPresion"></canvas>
-            </div>
+            <button onclick="generarPDF()" class="btn btn-danger mb-4 w-100 py-2 fw-bold shadow-sm">📄 DESCARGAR REPORTE PDF</button>
+
+            <div class="card p-3"><h6>Drenaje: <span style="color:#0d6efd">Izq</span> / <span style="color:#dc3545">Der</span></h6><canvas id="chartDrenaje"></canvas></div>
+            <div class="card p-3"><h6>Presión (<span style="color:#dc3545">A</span>/<span style="color:#0d6efd">B</span>) y <span style="color:#198754">Pulso</span></h6><canvas id="chartPresion"></canvas></div>
+            <div class="card p-3"><h6>Glucosa (mg/dL)</h6><canvas id="chartGlucosa"></canvas></div>
 
             <div class="card p-3">
-                <h6>Glucosa (mg/dL)</h6>
-                <canvas id="chartGlucosa"></canvas>
-            </div>
-
-            <div class="card p-3 shadow-sm">
                 <div class="table-responsive">
-                    <table class="table align-middle text-start">
+                    <table id="tablaHistorial" class="table align-middle text-start small">
                         <thead><tr><th>Fecha</th><th>Tipo</th><th>Medición</th><th></th></tr></thead>
                         <tbody>
                             {% for r in registros %}
                             <tr>
                                 <td>{{ r.fecha }}<br><small class="text-muted">{{ r.hora }}</small></td>
+                                <td>{{ r.tipo|capitalize }}</td>
                                 <td>
-                                    {% if r.tipo == 'drenaje' %}<span class="badge-drenaje">Drenaje</span>
-                                    {% elif r.tipo == 'presion' %}<span class="badge-presion">Presión</span>
-                                    {% elif r.tipo == 'glucosa' %}<span class="badge-glucosa">Glucosa</span>
+                                    {% if r.tipo == 'drenaje' %}I:{{r.cant_izq or 0}}/D:{{r.cant_der or 0}}ml
+                                    {% elif r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}} (P:{{r.pulso or '-'}})
+                                    {% elif r.tipo == 'glucosa' %}{{r.glucosa}} mg/dL
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% if r.tipo == 'drenaje' %}I: {{ r.cant_izq or 0 }} / D: {{ r.cant_der or 0 }} ml
-                                    {% elif r.tipo == 'presion' %}{{ r.presion_alta }}/{{ r.presion_baja }} <small>(P:{{r.pulso or '-'}})</small>
-                                    {% elif r.tipo == 'glucosa' %}{{ r.glucosa }} mg/dL
-                                    {% endif %}
-                                </td>
-                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger fs-5" style="text-decoration:none" onclick="return confirm('¿Borrar?')">🗑️</a></td>
+                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Borrar?')">🗑️</a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -118,49 +102,59 @@
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+
         <script>
-            const rawData = [ {% for r in registros|reverse %} { fecha: "{{r.fecha}}", tipo: "{{r.tipo}}", izq: {{ r.cant_izq or 0 }}, der: {{ r.cant_der or 0 }}, alta: {{r.presion_alta or 0}}, baja: {{r.presion_baja or 0}}, pulso: {{r.pulso or 0}}, glu: {{r.glucosa or 0}} }, {% endfor %} ];
+            const rawData = [ {% for r in registros|reverse %} { fecha: "{{r.fecha}}", hora: "{{r.hora}}", tipo: "{{r.tipo}}", izq: {{ r.cant_izq or 0 }}, der: {{ r.cant_der or 0 }}, alta: {{r.presion_alta or 0}}, baja: {{r.presion_baja or 0}}, pulso: {{r.pulso or 0}}, glu: {{r.glucosa or 0}}, obs: "{{r.observaciones or ''}}" }, {% endfor %} ];
             
+            // GRAFICOS (Igual que antes pero con doble eje en presión)
             const dData = rawData.filter(d => d.tipo === 'drenaje');
-            new Chart(document.getElementById('chartDrenaje'), {
-                type: 'line',
-                data: {
-                    labels: dData.map(d => d.fecha),
-                    datasets: [
-                        { label: 'Izq', data: dData.map(d => d.izq), borderColor: '#0d6efd', tension: 0.3 },
-                        { label: 'Der', data: dData.map(d => d.der), borderColor: '#dc3545', tension: 0.3 }
-                    ]
-                }
-            });
+            new Chart(document.getElementById('chartDrenaje'), { type: 'line', data: { labels: dData.map(d => d.fecha), datasets: [{ label: 'Izq', data: dData.map(d => d.izq), borderColor: '#0d6efd' }, { label: 'Der', data: dData.map(d => d.der), borderColor: '#dc3545' }] } });
 
-            // GRÁFICO DUAL: Eje Izquierdo para Presión, Eje Derecho para Pulso
             const pData = rawData.filter(d => d.tipo === 'presion');
-            new Chart(document.getElementById('chartPresion'), {
-                type: 'line',
-                data: {
-                    labels: pData.map(d => d.fecha),
+            new Chart(document.getElementById('chartPresion'), { 
+                type: 'line', 
+                data: { 
+                    labels: pData.map(d => d.fecha), 
                     datasets: [
-                        { label: 'Presión Alta', data: pData.map(d => d.alta), borderColor: '#dc3545', yAxisID: 'yPresion', tension: 0.3 },
-                        { label: 'Presión Baja', data: pData.map(d => d.baja), borderColor: '#0d6efd', yAxisID: 'yPresion', tension: 0.3 },
-                        { label: 'Pulso (LPM)', data: pData.map(d => d.pulso), borderColor: '#198754', borderDash: [5, 5], yAxisID: 'yPulso', tension: 0.3 }
-                    ]
+                        { label: 'Alta', data: pData.map(d => d.alta), borderColor: '#dc3545', yAxisID: 'yP' },
+                        { label: 'Baja', data: pData.map(d => d.baja), borderColor: '#0d6efd', yAxisID: 'yP' },
+                        { label: 'Pulso', data: pData.map(d => d.pulso), borderColor: '#198754', borderDash: [5,5], yAxisID: 'yL' }
+                    ] 
                 },
-                options: {
-                    scales: {
-                        yPresion: { type: 'linear', position: 'left', title: { display: true, text: 'mmHg (Presión)' } },
-                        yPulso: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'LPM (Pulso)' } }
-                    }
-                }
+                options: { scales: { yP: { type: 'linear', position: 'left' }, yL: { type: 'linear', position: 'right', grid: {drawOnChartArea: false} } } }
             });
 
-            const gData = rawData.filter(d => d.tipo === 'glucosa');
-            new Chart(document.getElementById('chartGlucosa'), {
-                type: 'line',
-                data: {
-                    labels: gData.map(d => d.fecha),
-                    datasets: [{ label: 'mg/dL', data: gData.map(d => d.glu), borderColor: '#ffc107', fill: true, backgroundColor: 'rgba(255,193,7,0.1)', tension: 0.3 }]
-                }
-            });
+            new Chart(document.getElementById('chartGlucosa'), { type: 'line', data: { labels: rawData.filter(d => d.tipo === 'glucosa').map(d => d.fecha), datasets: [{ label: 'mg/dL', data: rawData.filter(d => d.tipo === 'glucosa').map(d => d.glu), borderColor: '#ffc107' }] } });
+
+            // FUNCIÓN PARA GENERAR PDF
+            async function generarPDF() {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.setFontSize(18);
+                doc.text("Reporte de Control Médico", 14, 20);
+                doc.setFontSize(12);
+                doc.text("Paciente: Madre de Mauro - Generado el: " + new Date().toLocaleDateString(), 14, 30);
+
+                const tableBody = rawData.reverse().map(r => {
+                    let med = "";
+                    if(r.tipo === 'drenaje') med = `Izq: ${r.izq}ml / Der: ${r.der}ml`;
+                    else if(r.tipo === 'presion') med = `${r.alta}/${r.baja} (P: ${r.pulso})`;
+                    else med = `${r.glu} mg/dL`;
+                    return [r.fecha, r.hora, r.tipo.toUpperCase(), med, r.obs];
+                });
+
+                doc.autoTable({
+                    startY: 40,
+                    head: [['Fecha', 'Hora', 'Tipo', 'Medición', 'Observaciones']],
+                    body: tableBody,
+                    theme: 'grid'
+                });
+
+                doc.save(`Reporte_Salud_${new Date().toISOString().split('T')[0]}.pdf`);
+            }
         </script>
         {% endif %}
     </div>
