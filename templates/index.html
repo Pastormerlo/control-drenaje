@@ -38,7 +38,7 @@
         <div class="col-md-8">
             <div class="card p-4">
                 <h3 class="text-center mb-4">Nuevo Registro</h3>
-                {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+                {% if success %}<div class="alert alert-success text-center">{{ success }}</div>{% endif %}
                 <form action="{{ url_for('cargar_registro') }}" method="POST">
                     <div class="row g-3">
                         <div class="col-6"><label class="form-label">Fecha</label><input type="date" name="fecha" id="f_act" class="form-control" required></div>
@@ -77,15 +77,15 @@
         {% endif %}
 
         {% if modo == 'ver' %}
-        <div class="col-md-10">
-            <div class="card p-3"><h6 class="text-center">Evolución Drenaje (ml)</h6><canvas id="chartDrenaje"></canvas></div>
-            <div class="card p-3"><h6 class="text-center">Presión Arterial</h6><canvas id="chartPresion"></canvas></div>
-            <div class="card p-3"><h6 class="text-center">Glucosa en Sangre</h6><canvas id="chartGlucosa"></canvas></div>
+        <div class="col-md-10 text-center">
+            <div class="card p-3"><h6>Drenaje: <span style="color:#0d6efd">Izquierdo</span> vs <span style="color:#dc3545">Derecho</span></h6><canvas id="chartDrenaje"></canvas></div>
+            <div class="card p-3"><h6>Presión: <span style="color:#dc3545">Alta</span> y <span style="color:#0d6efd">Baja</span></h6><canvas id="chartPresion"></canvas></div>
+            <div class="card p-3"><h6>Glucosa (mg/dL)</h6><canvas id="chartGlucosa"></canvas></div>
 
             <div class="card p-3">
                 <div class="table-responsive">
-                    <table class="table align-middle">
-                        <thead><tr><th>Fecha</th><th>Tipo</th><th>Medición</th><th>Acción</th></tr></thead>
+                    <table class="table align-middle text-start">
+                        <thead><tr><th>Fecha</th><th>Tipo</th><th>Medición</th><th></th></tr></thead>
                         <tbody>
                             {% for r in registros %}
                             <tr>
@@ -98,11 +98,11 @@
                                 </td>
                                 <td>
                                     {% if r.tipo == 'drenaje' %}I: {{ r.cant_izq or 0 }} / D: {{ r.cant_der or 0 }} ml
-                                    {% elif r.tipo == 'presion' %}{{ r.presion_alta }}/{{ r.presion_baja }} <small>(P:{{r.pulso}})</small>
+                                    {% elif r.tipo == 'presion' %}{{ r.presion_alta }}/{{ r.presion_baja }}
                                     {% elif r.tipo == 'glucosa' %}{{ r.glucosa }} mg/dL
                                     {% endif %}
                                 </td>
-                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger fs-5" onclick="return confirm('¿Borrar este registro?')">🗑️</a></td>
+                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Borrar registro?')">🗑️</a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -112,10 +112,9 @@
         </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
-            // Datos procesados desde Python (se invierten para que el gráfico vaya de pasado a presente)
             const data = [ {% for r in registros|reverse %} { fecha: "{{r.fecha}}", tipo: "{{r.tipo}}", izq: {{ r.cant_izq or 0 }}, der: {{ r.cant_der or 0 }}, alta: {{r.presion_alta or 0}}, baja: {{r.presion_baja or 0}}, glu: {{r.glucosa or 0}} }, {% endfor %} ];
             
-            // 1. Gráfico Drenaje (Doble línea)
+            // Drenaje: Azul Izq, Rojo Der
             const dData = data.filter(d => d.tipo === 'drenaje');
             new Chart(document.getElementById('chartDrenaje'), {
                 type: 'line',
@@ -123,31 +122,31 @@
                     labels: dData.map(d => d.fecha),
                     datasets: [
                         { label: 'Izquierdo', data: dData.map(d => d.izq), borderColor: '#0d6efd', tension: 0.3 },
-                        { label: 'Derecho', data: dData.map(d => d.der), borderColor: '#6610f2', tension: 0.3 }
+                        { label: 'Derecho', data: dData.map(d => d.der), borderColor: '#dc3545', tension: 0.3 }
                     ]
                 }
             });
 
-            // 2. Gráfico Presión (Doble línea)
+            // Presión: Rojo Alta, Azul Baja
             const pData = data.filter(d => d.tipo === 'presion');
             new Chart(document.getElementById('chartPresion'), {
                 type: 'line',
                 data: {
                     labels: pData.map(d => d.fecha),
                     datasets: [
-                        { label: 'Alta (Sist)', data: pData.map(d => d.alta), borderColor: '#dc3545', tension: 0.3 },
-                        { label: 'Baja (Diast)', data: pData.map(d => d.baja), borderColor: '#0dcaf0', tension: 0.3 }
+                        { label: 'Sistólica (Alta)', data: pData.map(d => d.alta), borderColor: '#dc3545', tension: 0.3 },
+                        { label: 'Diastólica (Baja)', data: pData.map(d => d.baja), borderColor: '#0d6efd', tension: 0.3 }
                     ]
                 }
             });
 
-            // 3. Gráfico Glucosa (Línea simple)
+            // Glucosa: Amarillo
             const gData = data.filter(d => d.tipo === 'glucosa');
             new Chart(document.getElementById('chartGlucosa'), {
                 type: 'line',
                 data: {
                     labels: gData.map(d => d.fecha),
-                    datasets: [{ label: 'mg/dL', data: gData.map(d => d.glu), borderColor: '#ffc107', backgroundColor: 'rgba(255, 193, 7, 0.1)', fill: true, tension: 0.3 }]
+                    datasets: [{ label: 'mg/dL', data: gData.map(d => d.glu), borderColor: '#ffc107', tension: 0.3, fill: true, backgroundColor: 'rgba(255, 193, 7, 0.1)' }]
                 }
             });
         </script>
