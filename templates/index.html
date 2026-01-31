@@ -2,140 +2,118 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Control de Drenaje</title>
+    <title>Sistema de Drenaje</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .color-izq { color: #0d6efd; font-weight: bold; }
-        .color-der { color: #dc3545; font-weight: bold; }
-        .card-grafico { height: 350px; }
-        .badge-user { background-color: #f8f9fa; color: #6c757d; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; border: 1px solid #dee2e6; }
+        .color-izq { color:#0d6efd; font-weight:bold }
+        .color-der { color:#dc3545; font-weight:bold }
+        .alert-success { font-weight: bold; border-radius: 10px; }
+        .btn-pdf { background-color: #e74c3c; color: white; border: none; }
+        .btn-pdf:hover { background-color: #c0392b; color: white; }
     </style>
 </head>
 <body class="bg-light">
 <div class="container py-3">
-    <h3 class="text-center mb-3">🩺 Control de Drenaje</h3>
 
-    <form method="POST" action="/" class="card p-3 mb-4 shadow-sm" id="drainForm">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-sm">⬅ Volver al Menú</a>
+        <span class="badge bg-primary">👤 {{ usuario }}</span>
+    </div>
+
+    {% if modo == 'cargar' %}
+    <h4 class="text-center mb-3">✍️ Nuevo Registro</h4>
+    
+    {% if success %}
+    <div class="alert alert-success text-center shadow-sm">
+        {{ success }}
+    </div>
+    {% endif %}
+
+    <form method="POST" class="card p-3 shadow-sm">
         <div class="row g-2">
             <div class="col-6">
-                <label class="form-label small">Fecha</label>
-                <input type="date" name="fecha" id="f_auto" class="form-control" required>
+                <label class="form-label">Fecha</label>
+                <input type="date" name="fecha" id="fecha" class="form-control" required>
             </div>
             <div class="col-6">
-                <label class="form-label small">Hora</label>
-                <input type="time" name="hora" id="h_auto" class="form-control" required>
+                <label class="form-label">Hora</label>
+                <input type="time" name="hora" id="hora" class="form-control" required>
             </div>
         </div>
-        <label class="form-label mt-2 small">👤 Responsable:</label>
-        <input type="text" name="quien" id="quien_input" class="form-control" required>
+        <label class="mt-2">💧 Izquierdo (ml)</label>
+        <input type="number" step="0.01" name="cantidad_izq" class="form-control" required>
+        <label class="mt-2">💧 Derecho (ml)</label>
+        <input type="number" step="0.01" name="cantidad_der" class="form-control" required>
+        <label class="mt-2">Observaciones</label>
+        <textarea name="observaciones" class="form-control"></textarea>
         
-        <label class="form-label mt-2 small">💧 Izquierdo (ml)</label>
-        <input type="number" name="cantidad_izq" step="0.01" class="form-control" required>
-        
-        <label class="form-label mt-2 small">💧 Derecho (ml)</label>
-        <input type="number" name="cantidad_der" step="0.01" required class="form-control">
-
-        <label class="form-label mt-2 small">Observaciones</label>
-        <textarea name="observaciones" class="form-control" rows="2"></textarea>
-        
-        <button type="submit" class="btn btn-primary mt-3 w-100 fw-bold">GUARDAR REGISTRO</button>
+        <button type="submit" class="btn btn-primary mt-3 w-100 fw-bold">GUARDAR Y CARGAR OTRO</button>
     </form>
+    {% endif %}
 
-    <div class="card mb-4 shadow-sm p-2 card-grafico">
-        <h6 class="text-center text-muted small">Tendencia de Drenaje (ml)</h6>
-        <canvas id="graficoLineas"></canvas>
+    {% if modo == 'ver' %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">📊 Historial</h4>
+        <a href="{{ url_for('descargar_pdf') }}" class="btn btn-pdf btn-sm fw-bold">
+            📄 DESCARGAR PDF
+        </a>
+    </div>
+    
+    <div class="card p-3 mb-4 shadow-sm">
+        <h6 class="text-center text-muted">Tendencia de Drenaje (ml)</h6>
+        <canvas id="grafico"></canvas>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0">📋 Historial</h5>
-        <button onclick="exportarExcel()" class="btn btn-success btn-sm fw-bold">📊 Excel</button>
-    </div>
-
-    <div class="list-group mb-5">
-        {% for r in registros %}
-        <div class="list-group-item shadow-sm mb-1 rounded">
-            <div class="d-flex justify-content-between">
-                <span class="small text-muted">{{ r.fecha }} — {{ r.hora }}</span>
-                <a href="/borrar/{{ r.id }}" class="text-danger fw-bold text-decoration-none" onclick="return confirm('¿Borrar?')">✖</a>
-            </div>
-            <div class="mt-1">
-                <span class="color-izq">I: {{ r.cant_izq }} ml</span> 
-                <span class="text-muted mx-1">|</span> 
-                <span class="color-der">D: {{ r.cant_der }} ml</span>
-            </div>
-            <div class="d-flex justify-content-between align-items-center mt-2">
-                <small class="text-secondary">{% if r.observaciones %}{{ r.observaciones }}{% endif %}</small>
-                <span class="badge-user">👤 {{ r.quien }}</span>
-            </div>
+    <h5>📋 Mis Registros</h5>
+    {% for r in registros %}
+    <div class="card p-2 mb-2 shadow-sm">
+        <div class="d-flex justify-content-between">
+            <small class="fw-bold text-muted">{{ r.fecha }} — {{ r.hora }}</small>
+            <a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Eliminar?')">✖</a>
         </div>
-        {% endfor %}
+        <div class="my-1">
+            <span class="color-izq">I: {{ r.cant_izq }} ml</span> | <span class="color-der">D: {{ r.cant_der }} ml</span>
+        </div>
+        {% if r.observaciones %}
+        <small class="text-muted italic border-top d-block mt-1 pt-1">"{{ r.observaciones }}"</small>
+        {% endif %}
     </div>
+    {% else %}
+    <div class="text-center text-muted py-4">No hay registros cargados.</div>
+    {% endfor %}
+    {% endif %}
+
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
 <script>
-    window.onload = function() {
-        const ahora = new Date();
-        document.getElementById('f_auto').value = ahora.toISOString().split('T')[0];
-        document.getElementById('h_auto').value = ahora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-        const uNom = localStorage.getItem('uNom');
-        if (uNom) document.getElementById('quien_input').value = uNom;
+    if (document.getElementById('fecha')) {
+        const hoy = new Date();
+        document.getElementById('fecha').value = hoy.toISOString().split("T")[0];
+        document.getElementById('hora').value = hoy.toTimeString().slice(0,5);
     }
 
-    document.getElementById('drainForm').onsubmit = function() {
-        localStorage.setItem('uNom', document.getElementById('quien_input').value);
-    };
+    {% if modo == 'ver' and registros %}
+    const labels = [{% for r in registros|reverse %}"{{ r.fecha }} {{ r.hora }}",{% endfor %}];
+    const izq = [{% for r in registros|reverse %}{{ r.cant_izq }},{% endfor %}];
+    const der = [{% for r in registros|reverse %}{{ r.cant_der }},{% endfor %}];
 
-    const etiquetas = [{% for r in registros|reverse %}"{{ r.fecha }} {{ r.hora }}"{% if not loop.last %}, {% endif %}{% endfor %}].slice(-10);
-    const dIzq = [{% for r in registros|reverse %}{{ r.cant_izq }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-10);
-    const dDer = [{% for r in registros|reverse %}{{ r.cant_der }}{% if not loop.last %}, {% endif %}{% endfor %}].slice(-10);
-
-    new Chart(document.getElementById('graficoLineas'), {
-        type: 'line', // CAMBIO A LÍNEAS
+    new Chart(document.getElementById('grafico'), {
+        type: "line",
         data: {
-            labels: etiquetas,
+            labels: labels,
             datasets: [
-                { 
-                    label: 'Izquierdo', 
-                    data: dIzq, 
-                    borderColor: '#0d6efd', 
-                    backgroundColor: '#0d6efd',
-                    tension: 0.3, // Suaviza la línea
-                    fill: false 
-                },
-                { 
-                    label: 'Derecho', 
-                    data: dDer, 
-                    borderColor: '#dc3545', 
-                    backgroundColor: '#dc3545',
-                    tension: 0.3, 
-                    fill: false 
-                }
+                { label: "Izq", data: izq, borderColor: "#0d6efd", tension: 0.3, fill: false },
+                { label: "Der", data: der, borderColor: "#dc3545", tension: 0.3, fill: false }
             ]
         },
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false,
-            scales: { 
-                y: { beginAtZero: true, title: { display: true, text: 'ml' } },
-                x: { ticks: { display: false } } // Ocultamos fechas largas para que no se amontonen
-            }
+        options: {
+            responsive: true,
+            maintainAspectRatio: true
         }
     });
-
-    function exportarExcel() {
-        const datos = [["Fecha", "Hora", "Responsable", "Izq (ml)", "Der (ml)", "Observaciones"]];
-        {% for r in registros %}
-        datos.push(["{{ r.fecha }}", "{{ r.hora }}", "{{ r.quien }}", {{ r.cant_izq }}, {{ r.cant_der }}, "{{ r.observaciones }}"]);
-        {% endfor %}
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(datos);
-        XLSX.utils.book_append_sheet(wb, ws, "Drenajes");
-        XLSX.writeFile(wb, "Control_Drenaje_Bully.xlsx");
-    }
+    {% endif %}
 </script>
 </body>
 </html>

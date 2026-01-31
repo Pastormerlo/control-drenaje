@@ -1,73 +1,179 @@
-from flask import Flask, render_template, request, redirect, url_for
-import psycopg2
-from psycopg2.extras import RealDictCursor
 import os
+import psycopg2
+from psycopg2.extras import DictCursor
+from flask import Flask, render_template, request, redirect, url_for, session, send_file
+import io
+from werkzeug.security import generate_password_hash, check_password_hash
+from fpdf import FPDF
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "clave-secreta-muy-segura")
+
+# CONFIGURACIÓN DE POSTGRESQL
+# Render proporciona la URL en la variable DATABASE_URL
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def conectar():
-    return psycopg2.connect(DATABASE_URL, sslmode='require')
+    # En Render, la URL a veces empieza con 'postgres://', 
+    # pero SQLAlchemy/Psycopg2 a veces necesitan 'postgresql://'
+    url = DATABASE_URL
+    if url and url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    
+    conn = psycopg2.connect(url, sslmode='require')
+    return conn
 
-@app.before_request
-def inicializar_db():
-    with conectar() as con:
-        with con.cursor() as cur:
-            # Creamos una tabla totalmente nueva para evitar conflictos de columnas
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS registros_v2 (
-                    id SERIAL PRIMARY KEY,
-                    fecha TEXT,
-                    hora TEXT,
-                    cant_izq FLOAT,
-                    cant_der FLOAT,
-                    observaciones TEXT,
-                    quien TEXT
-                )
-            """)
-        con.commit()
+def init_db():
+    """Crea las tablas en PostgreSQL si no existen."""
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute('''CREATE TABLE IF NOT EXISTS usuarios (
+                    id SERIAL PRIMARY KEY, 
+                    usuario TEXT UNIQUE NOT NULL, 
+                    password TEXT NOT NULL)''')
+    cur.execute('''CREATE TABLE IF NOT EXISTS registros (
+                    id SERIAL PRIMARY KEY, 
+                    fecha TEXT, hora TEXT, cant_izq REAL, 
+                    cant_der REAL, observaciones TEXT, usuario TEXT)''')
+    conn.commit()
+    cur.close()
+    conn.close()
 
+# --- LOGIN ---
 @app.route("/", methods=["GET", "POST"])
-def index():
+@app.route("/login", methods=["GET", "POST"])
+def login():
     if request.method == "POST":
-        try:
-            fecha = request.form.get("fecha")
-            hora = request.form.get("hora")
-            quien = request.form.get("quien")
-            izq = float(request.form.get("cantidad_izq", 0).replace(',', '.'))
-            der = float(request.form.get("cantidad_der", 0).replace(',', '.'))
-            obs = request.form.get("observaciones", "")
-
-            with conectar() as con:
-                with con.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO registros_v2 (fecha, hora, cant_izq, cant_der, observaciones, quien)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (fecha, hora, izq, der, obs, quien))
-                con.commit()
-            return redirect(url_for('index'))
-        except Exception as e:
-            return f"Error crítico al guardar: {e}"
-
-    try:
-        con = conectar()
-        cur = con.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM registros_v2 ORDER BY fecha DESC, hora DESC")
-        registros = cur.fetchall()
+        username = request.form.get("usuario")
+        password = request.form.get("password")
+        conn = conectar()
+        cur = conn.cursor(cursor_factory=DictCursor)
+        cur.execute("SELECT * FROM usuarios WHERE usuario = %s", (username,))
+        user = cur.fetchone()
         cur.close()
-        con.close()
-        return render_template("index.html", registros=registros)
-    except Exception as e:
-        return f"Error al leer la base de datos: {e}"
+        conn.close()
+        if user and check_password_hash(user["password"], password):
+            session["usuario"] = user["usuario"]
+            return redirect(url_for("dashboard"))
+        return render_template("login.html", error="Usuario o contraseña incorrectos")
+    return render_template("login.html")
+
+# --- REGISTRO ---
+@app.route("/registro", methods=["GET", "POST"])
+def registro():
+    if request.method == "POST":
+        username = request.form.get("usuario")
+        password = request.form.get("password")
+        conn = conectar()
+        try:
+            cur = conn.cursor()
+            cur.execute("INSERT INTO usuarios (usuario, password) VALUES (%s, %s)",
+                        (username, generate_password_hash(password)))
+            conn.commit()
+            return redirect(url_for("login"))
+        except Exception:
+            return render_template("register.html", error="El usuario ya existe")
+        finally:
+            conn.close()
+    return render_template("register.html")
+
+@app.route("/dashboard")
+def dashboard():
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+    return render_template("dashboard.html", usuario=session["usuario"])
+
+# --- CARGAR ---
+@app.route("/cargar", methods=["GET", "POST"])
+def cargar_registro():
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+    success = None
+    if request.method == "POST":
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("""INSERT INTO registros (fecha, hora, cant_izq, cant_der, observaciones, usuario) 
+                       VALUES (%s,%s,%s,%s,%s,%s)""", 
+                    (request.form.get("fecha"), request.form.get("hora"), 
+                     request.form.get("cantidad_izq"), request.form.get("cantidad_der"), 
+                     request.form.get("observaciones"), session["usuario"]))
+        conn.commit()
+        cur.close()
+        conn.close()
+        success = "✅ Cargado correctamente"
+    return render_template("index.html", usuario=session["usuario"], modo="cargar", success=success)
+
+# --- VER ---
+@app.route("/ver")
+def ver_registros():
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+    conn = conectar()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    cur.execute("SELECT * FROM registros WHERE usuario = %s ORDER BY fecha DESC, hora DESC", (session["usuario"],))
+    registros = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template("index.html", usuario=session["usuario"], registros=registros, modo="ver")
+
+# --- PDF ---
+@app.route("/descargar_pdf")
+def descargar_pdf():
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+    conn = conectar()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    cur.execute("SELECT * FROM registros WHERE usuario = %s ORDER BY fecha DESC, hora DESC", (session["usuario"],))
+    registros = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(190, 10, "Informe de Control de Drenaje", ln=True, align="C")
+    pdf.ln(10)
+
+    pdf.set_fill_color(200, 220, 255)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(35, 10, "Fecha", 1, 0, "C", True)
+    pdf.cell(25, 10, "Hora", 1, 0, "C", True)
+    pdf.cell(30, 10, "Izq (ml)", 1, 0, "C", True)
+    pdf.cell(30, 10, "Der (ml)", 1, 0, "C", True)
+    pdf.cell(70, 10, "Observaciones", 1, 1, "C", True)
+
+    pdf.set_font("Helvetica", "", 9)
+    for r in registros:
+        pdf.cell(35, 10, str(r['fecha']), 1)
+        pdf.cell(25, 10, str(r['hora']), 1)
+        pdf.cell(30, 10, str(r['cant_izq']), 1)
+        pdf.cell(30, 10, str(r['cant_der']), 1)
+        obs = str(r['observaciones']).encode('latin-1', 'replace').decode('latin-1')
+        pdf.cell(70, 10, obs[:40], 1, 1)
+
+    pdf_output = pdf.output()
+    buffer = io.BytesIO(pdf_output)
+    buffer.seek(0)
+
+    return send_file(buffer, as_attachment=True, download_name=f"informe_{session['usuario']}.pdf", mimetype="application/pdf")
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
-    with conectar() as con:
-        with con.cursor() as cur:
-            cur.execute("DELETE FROM registros_v2 WHERE id = %s", (id,))
-        con.commit()
-    return redirect(url_for('index'))
+    if "usuario" in session:
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM registros WHERE id = %s AND usuario = %s", (id, session["usuario"]))
+        conn.commit()
+        cur.close()
+        conn.close()
+    return redirect(url_for("ver_registros"))
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 if __name__ == "__main__":
+    init_db()
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host='0.0.0.0', port=port)
