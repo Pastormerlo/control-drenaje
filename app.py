@@ -6,17 +6,20 @@ import io
 from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
 
-app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "clave-secreta-muy-segura")
+# --- CONFIGURACIÓN DE RUTAS ABSOLUTAS ---
+# Esto soluciona el error TemplateNotFound en servidores Linux
+base_dir = os.path.abspath(os.path.dirname(__file__))
+template_dir = os.path.join(base_dir, 'templates')
 
-# CONFIGURACIÓN DE POSTGRESQL
-# Render proporciona la URL en la variable DATABASE_URL
+app = Flask(__name__, template_folder=template_dir)
+app.secret_key = os.environ.get("SECRET_KEY", "clave-secreta-para-produccion")
+
+# --- CONEXIÓN A POSTGRESQL ---
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def conectar():
-    # En Render, la URL a veces empieza con 'postgres://', 
-    # pero SQLAlchemy/Psycopg2 a veces necesitan 'postgresql://'
     url = DATABASE_URL
+    # Ajuste necesario para que SQLAlchemy/Psycopg2 acepten la URL de Render
     if url and url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
     
@@ -24,7 +27,7 @@ def conectar():
     return conn
 
 def init_db():
-    """Crea las tablas en PostgreSQL si no existen."""
+    """Inicializa las tablas si no existen al arrancar la app."""
     conn = conectar()
     cur = conn.cursor()
     cur.execute('''CREATE TABLE IF NOT EXISTS usuarios (
@@ -39,7 +42,8 @@ def init_db():
     cur.close()
     conn.close()
 
-# --- LOGIN ---
+# --- RUTAS DE ACCESO ---
+
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -58,7 +62,6 @@ def login():
         return render_template("login.html", error="Usuario o contraseña incorrectos")
     return render_template("login.html")
 
-# --- REGISTRO ---
 @app.route("/registro", methods=["GET", "POST"])
 def registro():
     if request.method == "POST":
@@ -83,7 +86,8 @@ def dashboard():
         return redirect(url_for("login"))
     return render_template("dashboard.html", usuario=session["usuario"])
 
-# --- CARGAR ---
+# --- RUTAS DE DRENAJE ---
+
 @app.route("/cargar", methods=["GET", "POST"])
 def cargar_registro():
     if "usuario" not in session:
@@ -103,7 +107,6 @@ def cargar_registro():
         success = "✅ Cargado correctamente"
     return render_template("index.html", usuario=session["usuario"], modo="cargar", success=success)
 
-# --- VER ---
 @app.route("/ver")
 def ver_registros():
     if "usuario" not in session:
@@ -116,7 +119,8 @@ def ver_registros():
     conn.close()
     return render_template("index.html", usuario=session["usuario"], registros=registros, modo="ver")
 
-# --- PDF ---
+# --- GENERACIÓN DE PDF ---
+
 @app.route("/descargar_pdf")
 def descargar_pdf():
     if "usuario" not in session:
@@ -132,6 +136,8 @@ def descargar_pdf():
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(190, 10, "Informe de Control de Drenaje", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 12)
+    pdf.cell(190, 10, f"Usuario: {session['usuario']}", ln=True, align="C")
     pdf.ln(10)
 
     pdf.set_fill_color(200, 220, 255)
@@ -155,7 +161,12 @@ def descargar_pdf():
     buffer = io.BytesIO(pdf_output)
     buffer.seek(0)
 
-    return send_file(buffer, as_attachment=True, download_name=f"informe_{session['usuario']}.pdf", mimetype="application/pdf")
+    return send_file(
+        buffer, 
+        as_attachment=True, 
+        download_name=f"informe_{session['usuario']}.pdf", 
+        mimetype="application/pdf"
+    )
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
@@ -175,5 +186,6 @@ def logout():
 
 if __name__ == "__main__":
     init_db()
+    # Render usa el puerto que le asigna el entorno
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
