@@ -43,7 +43,6 @@
                     <div class="row g-3">
                         <div class="col-6"><label class="form-label">Fecha</label><input type="date" name="fecha" id="f_act" class="form-control" required></div>
                         <div class="col-6"><label class="form-label">Hora</label><input type="time" name="hora" id="h_act" class="form-control" required></div>
-                        
                         <div class="col-12 mt-3">
                             <label class="form-label fw-bold">Tipo de Control</label>
                             <select class="form-select form-select-lg" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
@@ -52,22 +51,18 @@
                                 <option value="glucosa">🩸 Glucosa</option>
                             </select>
                         </div>
-
                         <div id="campos_drenaje" class="row g-3 mt-1">
                             <div class="col-6"><label>Izq (ml)</label><input type="number" step="0.1" name="cantidad_izq" class="form-control"></div>
                             <div class="col-6"><label>Der (ml)</label><input type="number" step="0.1" name="cantidad_der" class="form-control"></div>
                         </div>
-
                         <div id="campos_presion" class="row g-3 mt-1 seccion-oculta">
                             <div class="col-4"><label>Alta</label><input type="number" name="presion_alta" class="form-control"></div>
                             <div class="col-4"><label>Baja</label><input type="number" name="presion_baja" class="form-control"></div>
                             <div class="col-4"><label>Pulso</label><input type="number" name="pulso" class="form-control"></div>
                         </div>
-
                         <div id="campos_glucosa" class="row g-3 mt-1 seccion-oculta">
                             <div class="col-12"><label>Nivel (mg/dL)</label><input type="number" name="glucosa" class="form-control"></div>
                         </div>
-
                         <div class="col-12 mt-3"><label>Notas</label><textarea name="observaciones" class="form-control"></textarea></div>
                         <button type="submit" class="btn btn-success btn-custom w-100 mt-4">💾 GUARDAR REGISTRO</button>
                     </div>
@@ -79,7 +74,7 @@
         {% if modo == 'ver' %}
         <div class="col-md-10 text-center">
             <div class="card p-3">
-                <h6>Evolución Drenaje: <span style="color:#0d6efd">Izq</span> / <span style="color:#dc3545">Der</span></h6>
+                <h6>Drenaje: <span style="color:#0d6efd">Izq</span> / <span style="color:#dc3545">Der</span></h6>
                 <canvas id="chartDrenaje"></canvas>
             </div>
             
@@ -113,7 +108,7 @@
                                     {% elif r.tipo == 'glucosa' %}{{ r.glucosa }} mg/dL
                                     {% endif %}
                                 </td>
-                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger fs-5" style="text-decoration:none" onclick="return confirm('¿Eliminar este registro?')">🗑️</a></td>
+                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger fs-5" style="text-decoration:none" onclick="return confirm('¿Borrar?')">🗑️</a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -126,7 +121,6 @@
         <script>
             const rawData = [ {% for r in registros|reverse %} { fecha: "{{r.fecha}}", tipo: "{{r.tipo}}", izq: {{ r.cant_izq or 0 }}, der: {{ r.cant_der or 0 }}, alta: {{r.presion_alta or 0}}, baja: {{r.presion_baja or 0}}, pulso: {{r.pulso or 0}}, glu: {{r.glucosa or 0}} }, {% endfor %} ];
             
-            // 1. Gráfico Drenaje
             const dData = rawData.filter(d => d.tipo === 'drenaje');
             new Chart(document.getElementById('chartDrenaje'), {
                 type: 'line',
@@ -139,27 +133,32 @@
                 }
             });
 
-            // 2. Gráfico Presión + Pulso (Integrado)
+            // GRÁFICO DUAL: Eje Izquierdo para Presión, Eje Derecho para Pulso
             const pData = rawData.filter(d => d.tipo === 'presion');
             new Chart(document.getElementById('chartPresion'), {
                 type: 'line',
                 data: {
                     labels: pData.map(d => d.fecha),
                     datasets: [
-                        { label: 'Alta', data: pData.map(d => d.alta), borderColor: '#dc3545', tension: 0.3 },
-                        { label: 'Baja', data: pData.map(d => d.baja), borderColor: '#0d6efd', tension: 0.3 },
-                        { label: 'Pulso', data: pData.map(d => d.pulso), borderColor: '#198754', borderDash: [5, 5], tension: 0.3 }
+                        { label: 'Presión Alta', data: pData.map(d => d.alta), borderColor: '#dc3545', yAxisID: 'yPresion', tension: 0.3 },
+                        { label: 'Presión Baja', data: pData.map(d => d.baja), borderColor: '#0d6efd', yAxisID: 'yPresion', tension: 0.3 },
+                        { label: 'Pulso (LPM)', data: pData.map(d => d.pulso), borderColor: '#198754', borderDash: [5, 5], yAxisID: 'yPulso', tension: 0.3 }
                     ]
+                },
+                options: {
+                    scales: {
+                        yPresion: { type: 'linear', position: 'left', title: { display: true, text: 'mmHg (Presión)' } },
+                        yPulso: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'LPM (Pulso)' } }
+                    }
                 }
             });
 
-            // 3. Gráfico Glucosa
             const gData = rawData.filter(d => d.tipo === 'glucosa');
             new Chart(document.getElementById('chartGlucosa'), {
                 type: 'line',
                 data: {
                     labels: gData.map(d => d.fecha),
-                    datasets: [{ label: 'mg/dL', data: gData.map(d => d.glu), borderColor: '#ffc107', backgroundColor: 'rgba(255,193,7,0.1)', fill: true, tension: 0.3 }]
+                    datasets: [{ label: 'mg/dL', data: gData.map(d => d.glu), borderColor: '#ffc107', fill: true, backgroundColor: 'rgba(255,193,7,0.1)', tension: 0.3 }]
                 }
             });
         </script>
