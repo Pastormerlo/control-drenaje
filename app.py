@@ -1,8 +1,7 @@
 import os
 import psycopg2
 from psycopg2.extras import DictCursor
-from flask import Flask, render_template, request, redirect, url_for, session, send_file
-import io
+from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -25,7 +24,7 @@ def init_db():
                     usuario TEXT UNIQUE NOT NULL, 
                     password TEXT NOT NULL)''')
     
-    # Tabla de registros mejorada (agregamos columnas nuevas)
+    # Tabla de registros (con todas las columnas necesarias)
     cur.execute('''CREATE TABLE IF NOT EXISTS registros (
                     id SERIAL PRIMARY KEY, 
                     fecha TEXT, hora TEXT, 
@@ -35,15 +34,19 @@ def init_db():
                     glucosa INTEGER,
                     observaciones TEXT, usuario TEXT)''')
     
-    # Truco para agregar columnas si la tabla ya existía de antes
-    try:
-        cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'drenaje'")
-        cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS presion_alta INTEGER")
-        cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS presion_baja INTEGER")
-        cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS pulso INTEGER")
-        cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS glucosa INTEGER")
-    except:
-        pass # Si ya existen, no hace nada
+    # Asegurar que las columnas existan por si la tabla es vieja
+    columnas = [
+        ("tipo", "TEXT DEFAULT 'drenaje'"),
+        ("presion_alta", "INTEGER"),
+        ("presion_baja", "INTEGER"),
+        ("pulso", "INTEGER"),
+        ("glucosa", "INTEGER")
+    ]
+    for col, tipo in columnas:
+        try:
+            cur.execute(f"ALTER TABLE registros ADD COLUMN IF NOT EXISTS {col} {tipo}")
+        except:
+            pass
 
     conn.commit()
     cur.close()
@@ -115,6 +118,17 @@ def ver_registros():
     cur.close()
     conn.close()
     return render_template("index.html", usuario=session["usuario"], registros=registros, modo="ver")
+
+@app.route("/borrar/<int:id>")
+def borrar(id):
+    if "usuario" not in session: return redirect(url_for("login"))
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM registros WHERE id = %s AND usuario = %s", (id, session["usuario"]))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return redirect(url_for("ver_registros"))
 
 @app.route("/logout")
 def logout():
