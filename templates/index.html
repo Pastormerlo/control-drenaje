@@ -6,27 +6,22 @@
     <title>Control de Salud - Mauro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card { border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: none; }
-        .btn-custom { border-radius: 10px; padding: 12px; font-weight: bold; font-size: 1.1rem; }
+        body { background-color: #f4f7f6; font-family: sans-serif; }
+        .card { border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
+        .btn-custom { border-radius: 10px; padding: 12px; font-weight: bold; }
         .seccion-oculta { display: none; }
-        .form-label { font-weight: 600; color: #444; }
-        .form-select-lg { border: 2px solid #0d6efd; background-color: #eef6ff; }
-        
-        /* Colores para las etiquetas de la tabla */
-        .badge-drenaje { background-color: #0d6efd; color: white; padding: 8px; border-radius: 6px; }
-        .badge-presion { background-color: #dc3545; color: white; padding: 8px; border-radius: 6px; }
-        .badge-glucosa { background-color: #ffc107; color: black; padding: 8px; border-radius: 6px; }
-        
-        .table-container { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .badge-drenaje { background-color: #0d6efd; color: white; padding: 5px 10px; border-radius: 5px; }
+        .badge-presion { background-color: #dc3545; color: white; padding: 5px 10px; border-radius: 5px; }
+        .badge-glucosa { background-color: #ffc107; color: black; padding: 5px 10px; border-radius: 5px; }
+        canvas { max-height: 250px; }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
     <div class="container">
-        <span class="navbar-brand mb-0 h1">🏥 Mi Centro de Salud</span>
-        <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Cerrar Sesión</a>
+        <span class="navbar-brand mb-0 h1">🏥 Control Médico</span>
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Salir</a>
     </div>
 </nav>
 
@@ -34,79 +29,47 @@
     <div class="row justify-content-center">
         <div class="col-md-8 text-center mb-4">
             <div class="btn-group w-100 shadow-sm">
-                <a href="{{ url_for('cargar_registro') }}" class="btn {% if modo == 'cargar' %}btn-primary{% else %}btn-outline-primary{% endif %}">Cargar Datos</a>
-                <a href="{{ url_for('ver_registros') }}" class="btn {% if modo == 'ver' %}btn-primary{% else %}btn-outline-primary{% endif %}">Ver Historial</a>
+                <a href="{{ url_for('cargar_registro') }}" class="btn {% if modo == 'cargar' %}btn-primary{% else %}btn-outline-primary{% endif %}">Cargar</a>
+                <a href="{{ url_for('ver_registros') }}" class="btn {% if modo == 'ver' %}btn-primary{% else %}btn-outline-primary{% endif %}">Historial</a>
             </div>
         </div>
 
         {% if modo == 'cargar' %}
         <div class="col-md-8">
-            <div class="card p-4 mb-5">
+            <div class="card p-4">
                 <h3 class="text-center mb-4">Nuevo Registro</h3>
-                
-                {% if success %}<div class="alert alert-success text-center"><strong>{{ success }}</strong></div>{% endif %}
-
+                {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
                 <form action="{{ url_for('cargar_registro') }}" method="POST">
                     <div class="row g-3">
-                        <div class="col-6">
-                            <label class="form-label">Fecha</label>
-                            <input type="date" name="fecha" class="form-control form-control-lg" required id="fecha_actual">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Hora</label>
-                            <input type="time" name="hora" class="form-control form-control-lg" required id="hora_actual">
-                        </div>
-
-                        <div class="col-12 mt-4">
-                            <label class="form-label text-primary">SELECCIONE TIPO DE CONTROL:</label>
-                            <select class="form-select form-select-lg mb-3" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
-                                <option value="drenaje">💧 Drenaje Diario</option>
-                                <option value="presion">❤️ Presión Arterial</option>
-                                <option value="glucosa">🩸 Glucosa en Sangre</option>
+                        <div class="col-6"><label class="form-label">Fecha</label><input type="date" name="fecha" id="f_act" class="form-control" required></div>
+                        <div class="col-6"><label class="form-label">Hora</label><input type="time" name="hora" id="h_act" class="form-control" required></div>
+                        
+                        <div class="col-12 mt-3">
+                            <label class="form-label fw-bold">Tipo de Control</label>
+                            <select class="form-select form-select-lg" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
+                                <option value="drenaje">💧 Drenaje</option>
+                                <option value="presion">❤️ Presión</option>
+                                <option value="glucosa">🩸 Glucosa</option>
                             </select>
                         </div>
 
-                        <hr>
-
-                        <div id="campos_drenaje" class="row g-3">
-                            <div class="col-6">
-                                <label class="form-label">Izq (ml)</label>
-                                <input type="number" step="0.1" name="cantidad_izq" class="form-control" placeholder="0.0">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label">Der (ml)</label>
-                                <input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="0.0">
-                            </div>
+                        <div id="campos_drenaje" class="row g-3 mt-1">
+                            <div class="col-6"><label>Izq (ml)</label><input type="number" step="0.1" name="cantidad_izq" class="form-control"></div>
+                            <div class="col-6"><label>Der (ml)</label><input type="number" step="0.1" name="cantidad_der" class="form-control"></div>
                         </div>
 
-                        <div id="campos_presion" class="row g-3 seccion-oculta">
-                            <div class="col-4">
-                                <label class="form-label">Sistólica</label>
-                                <input type="number" name="presion_alta" class="form-control" placeholder="Alta">
-                            </div>
-                            <div class="col-4">
-                                <label class="form-label">Diastólica</label>
-                                <input type="number" name="presion_baja" class="form-control" placeholder="Baja">
-                            </div>
-                            <div class="col-4">
-                                <label class="form-label">Pulso</label>
-                                <input type="number" name="pulso" class="form-control" placeholder="LPM">
-                            </div>
+                        <div id="campos_presion" class="row g-3 mt-1 seccion-oculta">
+                            <div class="col-4"><label>Alta</label><input type="number" name="presion_alta" class="form-control"></div>
+                            <div class="col-4"><label>Baja</label><input type="number" name="presion_baja" class="form-control"></div>
+                            <div class="col-4"><label>Pulso</label><input type="number" name="pulso" class="form-control"></div>
                         </div>
 
-                        <div id="campos_glucosa" class="row g-3 seccion-oculta">
-                            <div class="col-12">
-                                <label class="form-label text-center d-block">Nivel (mg/dL)</label>
-                                <input type="number" name="glucosa" class="form-control form-control-lg text-center" placeholder="Ej: 110">
-                            </div>
+                        <div id="campos_glucosa" class="row g-3 mt-1 seccion-oculta">
+                            <div class="col-12"><label>Nivel (mg/dL)</label><input type="number" name="glucosa" class="form-control"></div>
                         </div>
 
-                        <div class="col-12 mt-3">
-                            <label class="form-label">Observaciones</label>
-                            <textarea name="observaciones" class="form-control" rows="2" placeholder="Notas adicionales..."></textarea>
-                        </div>
-
-                        <button type="submit" class="btn btn-success btn-custom w-100 mt-4 shadow-sm">💾 GUARDAR REGISTRO</button>
+                        <div class="col-12 mt-3"><label>Notas</label><textarea name="observaciones" class="form-control"></textarea></div>
+                        <button type="submit" class="btn btn-success btn-custom w-100 mt-4">GUARDAR</button>
                     </div>
                 </form>
             </div>
@@ -115,38 +78,31 @@
 
         {% if modo == 'ver' %}
         <div class="col-md-10">
-            <div class="table-container">
-                <h4 class="mb-4 text-center text-secondary">Historial de Mediciones</h4>
+            <div class="card p-3"><h6 class="text-center">Tendencia Drenaje (Total ml)</h6><canvas id="chartDrenaje"></canvas></div>
+            <div class="card p-3"><h6 class="text-center">Presión Arterial</h6><canvas id="chartPresion"></canvas></div>
+            <div class="card p-3"><h6 class="text-center">Glucosa</h6><canvas id="chartGlucosa"></canvas></div>
+
+            <div class="card p-3">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Fecha / Hora</th>
-                                <th>Tipo</th>
-                                <th>Medición</th>
-                                <th>Notas</th>
-                            </tr>
-                        </thead>
+                    <table class="table align-middle">
+                        <thead><tr><th>Fecha</th><th>Tipo</th><th>Medición</th><th></th></tr></thead>
                         <tbody>
                             {% for r in registros %}
                             <tr>
-                                <td><strong>{{ r.fecha }}</strong><br><small class="text-muted">{{ r.hora }}</small></td>
+                                <td>{{ r.fecha }}<br><small>{{ r.hora }}</small></td>
                                 <td>
-                                    {% if r.tipo == 'drenaje' %} <span class="badge-drenaje">💧 Drenaje</span>
-                                    {% elif r.tipo == 'presion' %} <span class="badge-presion">❤️ Presión</span>
-                                    {% elif r.tipo == 'glucosa' %} <span class="badge-glucosa">🩸 Glucosa</span>
+                                    {% if r.tipo == 'drenaje' %}<span class="badge-drenaje">Drenaje</span>
+                                    {% elif r.tipo == 'presion' %}<span class="badge-presion">Presión</span>
+                                    {% elif r.tipo == 'glucosa' %}<span class="badge-glucosa">Glucosa</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if r.tipo == 'drenaje' %} 
-                                        I: {{ r.cant_izq }}ml / D: {{ r.cant_der }}ml
-                                    {% elif r.tipo == 'presion' %} 
-                                        {{ r.presion_alta }}/{{ r.presion_baja }} <small>(P: {{ r.pulso }})</small>
-                                    {% elif r.tipo == 'glucosa' %} 
-                                        {{ r.glucosa }} mg/dL
+                                    {% if r.tipo == 'drenaje' %}{{ (r.cant_izq or 0) + (r.cant_der or 0) }} ml
+                                    {% elif r.tipo == 'presion' %}{{ r.presion_alta }}/{{ r.presion_baja }}
+                                    {% elif r.tipo == 'glucosa' %}{{ r.glucosa }} mg/dL
                                     {% endif %}
                                 </td>
-                                <td><small>{{ r.observaciones or '-' }}</small></td>
+                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Borrar?')">🗑️</a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -154,33 +110,50 @@
                 </div>
             </div>
         </div>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            const data = [ {% for r in registros|reverse %} { fecha: "{{r.fecha}}", tipo: "{{r.tipo}}", val: {{ (r.cant_izq or 0) + (r.cant_der or 0) }}, alta: {{r.presion_alta or 0}}, baja: {{r.presion_baja or 0}}, glu: {{r.glucosa or 0}} }, {% endfor %} ];
+            
+            function crearChart(id, label, color, filterFn, mapFn) {
+                const filtered = data.filter(filterFn);
+                new Chart(document.getElementById(id), {
+                    type: 'line',
+                    data: { labels: filtered.map(d => d.fecha), datasets: [{ label: label, data: filtered.map(mapFn), borderColor: color, tension: 0.3, fill: false }] }
+                });
+            }
+
+            crearChart('chartDrenaje', 'Drenaje Total', '#0d6efd', d => d.tipo === 'drenaje', d => d.val);
+            crearChart('chartGlucosa', 'Glucosa', '#ffc107', d => d.tipo === 'glucosa', d => d.glu);
+            
+            // Chart Presión (Doble línea)
+            const pData = data.filter(d => d.tipo === 'presion');
+            new Chart(document.getElementById('chartPresion'), {
+                type: 'line',
+                data: {
+                    labels: pData.map(d => d.fecha),
+                    datasets: [
+                        { label: 'Alta', data: pData.map(d => d.alta), borderColor: '#dc3545' },
+                        { label: 'Baja', data: pData.map(d => d.baja), borderColor: '#0dcaf0' }
+                    ]
+                }
+            });
+        </script>
         {% endif %}
     </div>
 </div>
 
 <script>
-// Función para mostrar/ocultar campos
 function mostrarCampos() {
-    const tipo = document.getElementById('tipo_registro').value;
-    document.getElementById('campos_drenaje').classList.add('seccion-oculta');
-    document.getElementById('campos_presion').classList.add('seccion-oculta');
-    document.getElementById('campos_glucosa').classList.add('seccion-oculta');
-
-    if (tipo === 'drenaje') document.getElementById('campos_drenaje').classList.remove('seccion-oculta');
-    else if (tipo === 'presion') document.getElementById('campos_presion').classList.remove('seccion-oculta');
-    else if (tipo === 'glucosa') document.getElementById('campos_glucosa').classList.remove('seccion-oculta');
+    const t = document.getElementById('tipo_registro').value;
+    document.getElementById('campos_drenaje').classList.toggle('seccion-oculta', t !== 'drenaje');
+    document.getElementById('campos_presion').classList.toggle('seccion-oculta', t !== 'presion');
+    document.getElementById('campos_glucosa').classList.toggle('seccion-oculta', t !== 'glucosa');
 }
-
-// Autocompletar fecha y hora actual para comodidad de tu vieja
 window.onload = function() {
-    const ahora = new Date();
-    const fecha = ahora.toISOString().split('T')[0];
-    const hora = ahora.getHours().toString().padStart(2, '0') + ':' + ahora.getMinutes().toString().padStart(2, '0');
-    
-    if(document.getElementById('fecha_actual')) document.getElementById('fecha_actual').value = fecha;
-    if(document.getElementById('hora_actual')) document.getElementById('hora_actual').value = hora;
+    const n = new Date();
+    if(document.getElementById('f_act')) document.getElementById('f_act').value = n.toISOString().split('T')[0];
+    if(document.getElementById('h_act')) document.getElementById('h_act').value = n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');
 };
 </script>
-
 </body>
 </html>
