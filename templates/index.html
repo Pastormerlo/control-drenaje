@@ -13,7 +13,7 @@
         .badge-drenaje { background-color: #0d6efd; color: white; padding: 5px 10px; border-radius: 5px; }
         .badge-presion { background-color: #dc3545; color: white; padding: 5px 10px; border-radius: 5px; }
         .badge-glucosa { background-color: #ffc107; color: black; padding: 5px 10px; border-radius: 5px; }
-        canvas { max-height: 250px; }
+        canvas { max-height: 250px; width: 100% !important; }
     </style>
 </head>
 <body>
@@ -29,8 +29,8 @@
     <div class="row justify-content-center">
         <div class="col-md-8 text-center mb-4">
             <div class="btn-group w-100 shadow-sm">
-                <a href="{{ url_for('cargar_registro') }}" class="btn {% if modo == 'cargar' %}btn-primary{% else %}btn-outline-primary{% endif %}">Cargar</a>
-                <a href="{{ url_for('ver_registros') }}" class="btn {% if modo == 'ver' %}btn-primary{% else %}btn-outline-primary{% endif %}">Historial</a>
+                <a href="{{ url_for('cargar_registro') }}" class="btn {% if modo == 'cargar' %}btn-primary{% else %}btn-outline-primary{% endif %}">Cargar Datos</a>
+                <a href="{{ url_for('ver_registros') }}" class="btn {% if modo == 'ver' %}btn-primary{% else %}btn-outline-primary{% endif %}">Ver Historial</a>
             </div>
         </div>
 
@@ -48,7 +48,7 @@
                             <label class="form-label fw-bold">Tipo de Control</label>
                             <select class="form-select form-select-lg" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
                                 <option value="drenaje">💧 Drenaje</option>
-                                <option value="presion">❤️ Presión</option>
+                                <option value="presion">❤️ Presión / Pulso</option>
                                 <option value="glucosa">🩸 Glucosa</option>
                             </select>
                         </div>
@@ -69,7 +69,7 @@
                         </div>
 
                         <div class="col-12 mt-3"><label>Notas</label><textarea name="observaciones" class="form-control"></textarea></div>
-                        <button type="submit" class="btn btn-success btn-custom w-100 mt-4">GUARDAR</button>
+                        <button type="submit" class="btn btn-success btn-custom w-100 mt-4">💾 GUARDAR REGISTRO</button>
                     </div>
                 </form>
             </div>
@@ -78,11 +78,22 @@
 
         {% if modo == 'ver' %}
         <div class="col-md-10 text-center">
-            <div class="card p-3"><h6>Drenaje: <span style="color:#0d6efd">Izquierdo</span> vs <span style="color:#dc3545">Derecho</span></h6><canvas id="chartDrenaje"></canvas></div>
-            <div class="card p-3"><h6>Presión: <span style="color:#dc3545">Alta</span> y <span style="color:#0d6efd">Baja</span></h6><canvas id="chartPresion"></canvas></div>
-            <div class="card p-3"><h6>Glucosa (mg/dL)</h6><canvas id="chartGlucosa"></canvas></div>
+            <div class="card p-3">
+                <h6>Evolución Drenaje: <span style="color:#0d6efd">Izq</span> / <span style="color:#dc3545">Der</span></h6>
+                <canvas id="chartDrenaje"></canvas>
+            </div>
+            
+            <div class="card p-3">
+                <h6>Presión (<span style="color:#dc3545">A</span>/<span style="color:#0d6efd">B</span>) y <span style="color:#198754">Pulso</span></h6>
+                <canvas id="chartPresion"></canvas>
+            </div>
 
             <div class="card p-3">
+                <h6>Glucosa (mg/dL)</h6>
+                <canvas id="chartGlucosa"></canvas>
+            </div>
+
+            <div class="card p-3 shadow-sm">
                 <div class="table-responsive">
                     <table class="table align-middle text-start">
                         <thead><tr><th>Fecha</th><th>Tipo</th><th>Medición</th><th></th></tr></thead>
@@ -98,11 +109,11 @@
                                 </td>
                                 <td>
                                     {% if r.tipo == 'drenaje' %}I: {{ r.cant_izq or 0 }} / D: {{ r.cant_der or 0 }} ml
-                                    {% elif r.tipo == 'presion' %}{{ r.presion_alta }}/{{ r.presion_baja }}
+                                    {% elif r.tipo == 'presion' %}{{ r.presion_alta }}/{{ r.presion_baja }} <small>(P:{{r.pulso or '-'}})</small>
                                     {% elif r.tipo == 'glucosa' %}{{ r.glucosa }} mg/dL
                                     {% endif %}
                                 </td>
-                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Borrar registro?')">🗑️</a></td>
+                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger fs-5" style="text-decoration:none" onclick="return confirm('¿Eliminar este registro?')">🗑️</a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -110,43 +121,45 @@
                 </div>
             </div>
         </div>
+
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
-            const data = [ {% for r in registros|reverse %} { fecha: "{{r.fecha}}", tipo: "{{r.tipo}}", izq: {{ r.cant_izq or 0 }}, der: {{ r.cant_der or 0 }}, alta: {{r.presion_alta or 0}}, baja: {{r.presion_baja or 0}}, glu: {{r.glucosa or 0}} }, {% endfor %} ];
+            const rawData = [ {% for r in registros|reverse %} { fecha: "{{r.fecha}}", tipo: "{{r.tipo}}", izq: {{ r.cant_izq or 0 }}, der: {{ r.cant_der or 0 }}, alta: {{r.presion_alta or 0}}, baja: {{r.presion_baja or 0}}, pulso: {{r.pulso or 0}}, glu: {{r.glucosa or 0}} }, {% endfor %} ];
             
-            // Drenaje: Azul Izq, Rojo Der
-            const dData = data.filter(d => d.tipo === 'drenaje');
+            // 1. Gráfico Drenaje
+            const dData = rawData.filter(d => d.tipo === 'drenaje');
             new Chart(document.getElementById('chartDrenaje'), {
                 type: 'line',
                 data: {
                     labels: dData.map(d => d.fecha),
                     datasets: [
-                        { label: 'Izquierdo', data: dData.map(d => d.izq), borderColor: '#0d6efd', tension: 0.3 },
-                        { label: 'Derecho', data: dData.map(d => d.der), borderColor: '#dc3545', tension: 0.3 }
+                        { label: 'Izq', data: dData.map(d => d.izq), borderColor: '#0d6efd', tension: 0.3 },
+                        { label: 'Der', data: dData.map(d => d.der), borderColor: '#dc3545', tension: 0.3 }
                     ]
                 }
             });
 
-            // Presión: Rojo Alta, Azul Baja
-            const pData = data.filter(d => d.tipo === 'presion');
+            // 2. Gráfico Presión + Pulso (Integrado)
+            const pData = rawData.filter(d => d.tipo === 'presion');
             new Chart(document.getElementById('chartPresion'), {
                 type: 'line',
                 data: {
                     labels: pData.map(d => d.fecha),
                     datasets: [
-                        { label: 'Sistólica (Alta)', data: pData.map(d => d.alta), borderColor: '#dc3545', tension: 0.3 },
-                        { label: 'Diastólica (Baja)', data: pData.map(d => d.baja), borderColor: '#0d6efd', tension: 0.3 }
+                        { label: 'Alta', data: pData.map(d => d.alta), borderColor: '#dc3545', tension: 0.3 },
+                        { label: 'Baja', data: pData.map(d => d.baja), borderColor: '#0d6efd', tension: 0.3 },
+                        { label: 'Pulso', data: pData.map(d => d.pulso), borderColor: '#198754', borderDash: [5, 5], tension: 0.3 }
                     ]
                 }
             });
 
-            // Glucosa: Amarillo
-            const gData = data.filter(d => d.tipo === 'glucosa');
+            // 3. Gráfico Glucosa
+            const gData = rawData.filter(d => d.tipo === 'glucosa');
             new Chart(document.getElementById('chartGlucosa'), {
                 type: 'line',
                 data: {
                     labels: gData.map(d => d.fecha),
-                    datasets: [{ label: 'mg/dL', data: gData.map(d => d.glu), borderColor: '#ffc107', tension: 0.3, fill: true, backgroundColor: 'rgba(255, 193, 7, 0.1)' }]
+                    datasets: [{ label: 'mg/dL', data: gData.map(d => d.glu), borderColor: '#ffc107', backgroundColor: 'rgba(255,193,7,0.1)', fill: true, tension: 0.3 }]
                 }
             });
         </script>
