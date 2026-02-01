@@ -3,44 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Control Salud</title>
+    <title>Login - Salud</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #f4f7f6; height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .card { border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: none; width: 100%; max-width: 400px; }
-    </style>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0d6efd">
 </head>
-<body>
-    <div class="container p-3">
-        <div class="card p-4 mx-auto">
-            <h2 class="text-center mb-4 text-primary">🏥 Ingresar</h2>
-            
+<body class="bg-light d-flex align-items-center" style="height: 100vh;">
+    <div class="container">
+        <div class="card p-4 mx-auto shadow" style="max-width: 400px; border-radius: 15px;">
+            <h2 class="text-center text-primary mb-4">🏥 Ingresar</h2>
             {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                {% for category, message in messages %}
-                  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    {{ message }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                  </div>
-                {% endfor %}
-              {% endif %}
+              {% if messages %}{% for c, m in messages %}
+                <div class="alert alert-{{c}} small">{{m}}</div>
+              {% endfor %}{% endif %}
             {% endwith %}
-
             <form method="POST">
-                <div class="mb-3">
-                    <label class="form-label">Usuario</label>
-                    <input type="text" name="usuario" class="form-control" required placeholder="Tu usuario">
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">Contraseña</label>
-                    <input type="password" name="password" class="form-control" required placeholder="••••••••">
-                </div>
-                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">ENTRAR</button>
+                <div class="mb-3"><label>Usuario</label><input type="text" name="usuario" class="form-control" required></div>
+                <div class="mb-3"><label>Clave</label><input type="password" name="password" class="form-control" required></div>
+                <button type="submit" class="btn btn-primary w-100 fw-bold">ENTRAR</button>
             </form>
-            <div class="text-center mt-4">
-                <small>¿No tenés cuenta? <a href="{{ url_for('registro') }}" class="text-decoration-none">Registrate acá</a></small>
-            </div>
+            <div class="text-center mt-3"><a href="{{ url_for('registro') }}" class="text-decoration-none small">Crear cuenta</a></div>
         </div>
     </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
 </body>
 </html>
-
