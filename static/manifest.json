@@ -1,10 +1,9 @@
 {
   "name": "Control Salud Mauro",
   "short_name": "Salud",
-  "description": "Seguimiento médico para mi madre",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f7f6",
+  "background_color": "#ffffff",
   "theme_color": "#0d6efd",
   "icons": [
     {
