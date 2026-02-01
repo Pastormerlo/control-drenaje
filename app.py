@@ -1,13 +1,12 @@
 import os
 import psycopg2
 from psycopg2.extras import DictCursor
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
 
 app = Flask(__name__)
-# CAMBIA ESTA CLAVE por algo largo y raro para mayor seguridad
-app.secret_key = os.environ.get("SECRET_KEY", "mauro-seguridad-total-2026-salud")
+app.secret_key = os.environ.get("SECRET_KEY", "clave-segura-mauro-2026")
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
@@ -17,12 +16,20 @@ def conectar():
         url = url.replace("postgres://", "postgresql://", 1)
     return psycopg2.connect(url, sslmode='require')
 
-# Validación de seguridad para la clave
 def es_clave_segura(password):
     if len(password) < 8: return False
     if not re.search("[a-zA-Z]", password): return False
     if not re.search("[0-9]", password): return False
     return True
+
+# RUTAS PARA PWA (FUNDAMENTAL)
+@app.route('/manifest.json')
+def serve_manifest():
+    return send_from_directory('static', 'manifest.json')
+
+@app.route('/sw.js')
+def serve_sw():
+    return send_from_directory('static', 'sw.js')
 
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
@@ -30,20 +37,17 @@ def login():
     if request.method == "POST":
         username = request.form.get("usuario").strip().lower()
         password = request.form.get("password")
-        
         conn = conectar()
         cur = conn.cursor(cursor_factory=DictCursor)
         cur.execute("SELECT * FROM usuarios WHERE usuario = %s", (username,))
         user = cur.fetchone()
         cur.close()
         conn.close()
-
         if user and check_password_hash(user["password"], password):
             session["usuario"] = user["usuario"]
             return redirect(url_for("cargar_registro"))
         else:
             flash("Usuario o contraseña incorrectos.", "danger")
-            
     return render_template("login.html")
 
 @app.route("/registro", methods=["GET", "POST"])
@@ -51,21 +55,19 @@ def registro():
     if request.method == "POST":
         username = request.form.get("usuario").strip().lower()
         password = request.form.get("password")
-        
         if not es_clave_segura(password):
-            flash("La clave debe tener al menos 8 caracteres, letras y números.", "warning")
+            flash("Mínimo 8 caracteres, letras y números.", "warning")
             return render_template("register.html")
-
         conn = conectar()
         try:
             cur = conn.cursor()
             cur.execute("INSERT INTO usuarios (usuario, password) VALUES (%s, %s)",
                         (username, generate_password_hash(password, method='pbkdf2:sha256')))
             conn.commit()
-            flash("¡Cuenta creada! Ya podés ingresar.", "success")
+            flash("¡Cuenta creada!", "success")
             return redirect(url_for("login"))
         except:
-            flash("Ese usuario ya existe.", "danger")
+            flash("El usuario ya existe.", "danger")
         finally:
             conn.close()
     return render_template("register.html")
@@ -75,21 +77,19 @@ def cargar_registro():
     if "usuario" not in session: return redirect(url_for("login"))
     success = None
     if request.method == "POST":
-        tipo = request.form.get("tipo_registro")
         conn = conectar()
         cur = conn.cursor()
         cur.execute("""INSERT INTO registros 
             (fecha, hora, tipo, cant_izq, cant_der, presion_alta, presion_baja, pulso, glucosa, observaciones, usuario) 
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", 
-            (request.form.get("fecha"), request.form.get("hora"), tipo,
+            (request.form.get("fecha"), request.form.get("hora"), request.form.get("tipo_registro"),
              request.form.get("cantidad_izq") or None, request.form.get("cantidad_der") or None,
              request.form.get("presion_alta") or None, request.form.get("presion_baja") or None,
              request.form.get("pulso") or None, request.form.get("glucosa") or None,
              request.form.get("observaciones"), session["usuario"]))
         conn.commit()
-        cur.close()
         conn.close()
-        success = "✅ Guardado correctamente"
+        success = "✅ Guardado"
     return render_template("index.html", usuario=session["usuario"], modo="cargar", success=success)
 
 @app.route("/ver")
@@ -99,7 +99,6 @@ def ver_registros():
     cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("SELECT * FROM registros WHERE usuario = %s ORDER BY fecha DESC, hora DESC", (session["usuario"],))
     registros = cur.fetchall()
-    cur.close()
     conn.close()
     return render_template("index.html", usuario=session["usuario"], registros=registros, modo="ver")
 
@@ -110,7 +109,6 @@ def borrar(id):
     cur = conn.cursor()
     cur.execute("DELETE FROM registros WHERE id = %s AND usuario = %s", (id, session["usuario"]))
     conn.commit()
-    cur.close()
     conn.close()
     return redirect(url_for("ver_registros"))
 
