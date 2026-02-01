@@ -1,11 +1,13 @@
 import os
 import psycopg2
 from psycopg2.extras import DictCursor
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
+import re
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "clave-segura-salud")
+# CAMBIA ESTA CLAVE por algo largo y raro para mayor seguridad
+app.secret_key = os.environ.get("SECRET_KEY", "mauro-seguridad-total-2026-salud")
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
@@ -15,68 +17,57 @@ def conectar():
         url = url.replace("postgres://", "postgresql://", 1)
     return psycopg2.connect(url, sslmode='require')
 
-def init_db():
-    conn = conectar()
-    cur = conn.cursor()
-    cur.execute('''CREATE TABLE IF NOT EXISTS usuarios (
-                    id SERIAL PRIMARY KEY, 
-                    usuario TEXT UNIQUE NOT NULL, 
-                    password TEXT NOT NULL)''')
-    
-    cur.execute('''CREATE TABLE IF NOT EXISTS registros (
-                    id SERIAL PRIMARY KEY, 
-                    fecha TEXT, hora TEXT, 
-                    tipo TEXT DEFAULT 'drenaje',
-                    cant_izq REAL, cant_der REAL, 
-                    presion_alta INTEGER, presion_baja INTEGER, pulso INTEGER,
-                    glucosa INTEGER,
-                    observaciones TEXT, usuario TEXT)''')
-    
-    columnas = [
-        ("tipo", "TEXT DEFAULT 'drenaje'"),
-        ("presion_alta", "INTEGER"), ("presion_baja", "INTEGER"), ("pulso", "INTEGER"),
-        ("glucosa", "INTEGER")
-    ]
-    for col, tipo in columnas:
-        try:
-            cur.execute(f"ALTER TABLE registros ADD COLUMN IF NOT EXISTS {col} {tipo}")
-        except: pass
-    conn.commit()
-    cur.close()
-    conn.close()
-
-with app.app_context():
-    init_db()
+# Validación de seguridad para la clave
+def es_clave_segura(password):
+    if len(password) < 8: return False
+    if not re.search("[a-zA-Z]", password): return False
+    if not re.search("[0-9]", password): return False
+    return True
 
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username, password = request.form.get("usuario"), request.form.get("password")
+        username = request.form.get("usuario").strip().lower()
+        password = request.form.get("password")
+        
         conn = conectar()
         cur = conn.cursor(cursor_factory=DictCursor)
         cur.execute("SELECT * FROM usuarios WHERE usuario = %s", (username,))
         user = cur.fetchone()
         cur.close()
         conn.close()
+
         if user and check_password_hash(user["password"], password):
             session["usuario"] = user["usuario"]
             return redirect(url_for("cargar_registro"))
+        else:
+            flash("Usuario o contraseña incorrectos.", "danger")
+            
     return render_template("login.html")
 
 @app.route("/registro", methods=["GET", "POST"])
 def registro():
     if request.method == "POST":
-        username, password = request.form.get("usuario"), request.form.get("password")
+        username = request.form.get("usuario").strip().lower()
+        password = request.form.get("password")
+        
+        if not es_clave_segura(password):
+            flash("La clave debe tener al menos 8 caracteres, letras y números.", "warning")
+            return render_template("register.html")
+
         conn = conectar()
         try:
             cur = conn.cursor()
             cur.execute("INSERT INTO usuarios (usuario, password) VALUES (%s, %s)",
-                        (username, generate_password_hash(password)))
+                        (username, generate_password_hash(password, method='pbkdf2:sha256')))
             conn.commit()
+            flash("¡Cuenta creada! Ya podés ingresar.", "success")
             return redirect(url_for("login"))
-        except: return render_template("register.html", error="Usuario ya existe")
-        finally: conn.close()
+        except:
+            flash("Ese usuario ya existe.", "danger")
+        finally:
+            conn.close()
     return render_template("register.html")
 
 @app.route("/cargar", methods=["GET", "POST"])
