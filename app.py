@@ -4,7 +4,7 @@ from psycopg2.extras import DictCursor
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
-from datetime import timedelta  # Importamos para manejar el tiempo de sesión
+from datetime import timedelta
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave-segura-mauro-2026")
@@ -26,7 +26,7 @@ def es_clave_segura(password):
     if not re.search("[0-9]", password): return False
     return True
 
-# RUTAS PARA PWA (FUNDAMENTAL PARA INSTALACIÓN)
+# RUTAS PARA PWA
 @app.route('/manifest.json')
 def serve_manifest():
     return send_from_directory('static', 'manifest.json')
@@ -49,7 +49,7 @@ def login():
         conn.close()
         
         if user and check_password_hash(user["password"], password):
-            # --- ACTIVAMOS SESIÓN PERMANENTE ---
+            # ACTIVAR SESIÓN PERMANENTE
             session.permanent = True 
             session["usuario"] = user["usuario"]
             return redirect(url_for("cargar_registro"))
@@ -87,8 +87,9 @@ def cargar_registro():
     if request.method == "POST":
         conn = conectar()
         cur = conn.cursor()
+        # Nombres de columnas corregidos según tu base de datos (cant_izq / cant_der)
         cur.execute("""INSERT INTO registros 
-            (fecha, hora, tipo, cantidad_izq, cantidad_der, presion_alta, presion_baja, pulso, glucosa, observaciones, usuario) 
+            (fecha, hora, tipo, cant_izq, cant_der, presion_alta, presion_baja, pulso, glucosa, observaciones, usuario) 
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", 
             (request.form.get("fecha"), request.form.get("hora"), request.form.get("tipo_registro"),
              request.form.get("cantidad_izq") or None, request.form.get("cantidad_der") or None,
