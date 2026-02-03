@@ -4,9 +4,13 @@ from psycopg2.extras import DictCursor
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
+from datetime import timedelta  # Importamos para manejar el tiempo de sesión
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave-segura-mauro-2026")
+
+# --- CONFIGURACIÓN DE SESIÓN (7 DÍAS) ---
+app.permanent_session_lifetime = timedelta(days=7)
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
@@ -22,7 +26,7 @@ def es_clave_segura(password):
     if not re.search("[0-9]", password): return False
     return True
 
-# RUTAS PARA PWA (FUNDAMENTAL)
+# RUTAS PARA PWA (FUNDAMENTAL PARA INSTALACIÓN)
 @app.route('/manifest.json')
 def serve_manifest():
     return send_from_directory('static', 'manifest.json')
@@ -43,7 +47,10 @@ def login():
         user = cur.fetchone()
         cur.close()
         conn.close()
+        
         if user and check_password_hash(user["password"], password):
+            # --- ACTIVAMOS SESIÓN PERMANENTE ---
+            session.permanent = True 
             session["usuario"] = user["usuario"]
             return redirect(url_for("cargar_registro"))
         else:
@@ -58,6 +65,7 @@ def registro():
         if not es_clave_segura(password):
             flash("Mínimo 8 caracteres, letras y números.", "warning")
             return render_template("register.html")
+        
         conn = conectar()
         try:
             cur = conn.cursor()
@@ -80,7 +88,7 @@ def cargar_registro():
         conn = conectar()
         cur = conn.cursor()
         cur.execute("""INSERT INTO registros 
-            (fecha, hora, tipo, cant_izq, cant_der, presion_alta, presion_baja, pulso, glucosa, observaciones, usuario) 
+            (fecha, hora, tipo, cantidad_izq, cantidad_der, presion_alta, presion_baja, pulso, glucosa, observaciones, usuario) 
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", 
             (request.form.get("fecha"), request.form.get("hora"), request.form.get("tipo_registro"),
              request.form.get("cantidad_izq") or None, request.form.get("cantidad_der") or None,
