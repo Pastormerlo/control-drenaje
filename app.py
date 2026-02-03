@@ -1,10 +1,16 @@
 import os
 import psycopg2
 from psycopg2.extras import DictCursor
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
+import io
+
+# Librerías para el PDF
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave-segura-mauro-2026")
@@ -26,7 +32,6 @@ def es_clave_segura(password):
     if not re.search("[0-9]", password): return False
     return True
 
-# RUTAS PARA PWA
 @app.route('/manifest.json')
 def serve_manifest():
     return send_from_directory('static', 'manifest.json')
@@ -47,9 +52,7 @@ def login():
         user = cur.fetchone()
         cur.close()
         conn.close()
-        
         if user and check_password_hash(user["password"], password):
-            # ACTIVAR SESIÓN PERMANENTE
             session.permanent = True 
             session["usuario"] = user["usuario"]
             return redirect(url_for("cargar_registro"))
@@ -65,7 +68,6 @@ def registro():
         if not es_clave_segura(password):
             flash("Mínimo 8 caracteres, letras y números.", "warning")
             return render_template("register.html")
-        
         conn = conectar()
         try:
             cur = conn.cursor()
@@ -87,7 +89,6 @@ def cargar_registro():
     if request.method == "POST":
         conn = conectar()
         cur = conn.cursor()
-        # Nombres de columnas corregidos según tu base de datos (cant_izq / cant_der)
         cur.execute("""INSERT INTO registros 
             (fecha, hora, tipo, cant_izq, cant_der, presion_alta, presion_baja, pulso, glucosa, observaciones, usuario) 
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", 
@@ -110,6 +111,75 @@ def ver_registros():
     registros = cur.fetchall()
     conn.close()
     return render_template("index.html", usuario=session["usuario"], registros=registros, modo="ver")
+
+@app.route("/reporte-pdf")
+def descargar_pdf():
+    if "usuario" not in session: return redirect(url_for("login"))
+    dias = request.args.get('dias', default=7, type=int)
+    fecha_limite = datetime.now() - timedelta(days=dias)
+    conn = conectar()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s ORDER BY fecha DESC, hora DESC", 
+                (session["usuario"], fecha_limite.date()))
+    registros = cur.fetchall()
+    conn.close()
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    
+    # Intentar poner el logo si existe
+    try:
+        logo_path = os.path.join(app.root_path, 'static', 'icon-192.png')
+        logo = ImageReader(logo_path)
+        c.drawImage(logo, 50, 740, width=40, height=40, mask='auto')
+    except:
+        pass
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, 760, f"Reporte de Salud - Últimos {dias} días")
+    c.setFont("Helvetica", 10)
+    c.drawString(100, 745, f"Usuario: {session['usuario']} | Generado: {datetime.now().strftime('%d/%m/%Y')}")
+    c.line(50, 730, 550, 730)
+
+    y = 710
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(50, y, "Fecha/Hora")
+    c.drawString(180, y, "Tipo")
+    c.drawString(300, y, "Valores / Observaciones")
+    y -= 20
+    
+    c.setFont("Helvetica", 9)
+    for r in registros:
+        if y < 50:
+            c.showPage()
+            y = 750
+        
+        c.drawString(50, y, f"{r['fecha']} {r['hora']}")
+        
+        tipo = "Glucosa"
+        valores = f"{r['glucosa']} mg/dL"
+        if r['cant_izq'] or r['cant_der']:
+            tipo = "Drenaje"
+            valores = f"I: {r['cant_izq'] or 0} | D: {r['cant_der'] or 0}"
+        elif r['presion_alta']:
+            tipo = "Presión"
+            valores = f"{r['presion_alta']}/{r['presion_baja']} (P: {r['pulso']})"
+            
+        c.drawString(180, y, tipo)
+        c.drawString(300, y, valores)
+        y -= 15
+        if r['observaciones']:
+            c.setFont("Helvetica-Oblique", 8)
+            c.drawString(300, y, f"Obs: {r['observaciones'][:60]}")
+            c.setFont("Helvetica", 9)
+            y -= 12
+
+    c.save()
+    buf.seek(0)
+    response = make_response(buf.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=reporte_{dias}_dias.pdf'
+    return response
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
