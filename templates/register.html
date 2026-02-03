@@ -5,24 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro - Salud</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#198754">
 </head>
 <body class="bg-light d-flex align-items-center" style="height: 100vh;">
     <div class="container">
         <div class="card p-4 mx-auto shadow" style="max-width: 400px; border-radius: 15px;">
             <h2 class="text-center text-success mb-4">📝 Registro</h2>
+            
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}{% for c, m in messages %}
                 <div class="alert alert-{{c}} small">{{m}}</div>
               {% endfor %}{% endif %}
             {% endwith %}
+
             <form method="POST">
-                <div class="mb-3"><label>Usuario nuevo</label><input type="text" name="usuario" class="form-control" required></div>
-                <div class="mb-3"><label>Clave (8+ caracteres)</label><input type="password" name="password" class="form-control" required></div>
+                <div class="mb-3">
+                    <label class="form-label">Usuario nuevo</label>
+                    <input type="text" name="usuario" class="form-control" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Clave (8+ caracteres)</label>
+                    <div class="input-group">
+                        <input type="password" name="password" id="password" class="form-control" required>
+                        <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+
                 <button type="submit" class="btn btn-success w-100 fw-bold">REGISTRARME</button>
             </form>
-            <div class="text-center mt-3"><a href="{{ url_for('login') }}" class="text-decoration-none small">Volver al login</a></div>
+            
+            <div class="text-center mt-3">
+                <a href="{{ url_for('login') }}" class="text-decoration-none small">Volver al login</a>
+            </div>
         </div>
     </div>
+
+    <script>
+        // Registro del Service Worker para mantener la App instalable
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js');
+        }
+
+        // Lógica para mostrar/ocultar contraseña
+        const togglePassword = document.querySelector('#togglePassword');
+        const passwordInput = document.querySelector('#password');
+
+        togglePassword.addEventListener('click', function () {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.textContent = type === 'password' ? '👁️' : '🙈';
+        });
+    </script>
 </body>
 </html>
