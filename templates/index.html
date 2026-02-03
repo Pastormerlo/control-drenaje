@@ -3,21 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Salud - Mauro</title>
+    <title>Salud - Mauro</title>
     
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#0d6efd">
-    <link rel="apple-touch-icon" href="/static/icon-192.png">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body { background-color: #f4f7f6; }
-        .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .btn-custom { border-radius: 10px; padding: 10px 20px; font-weight: bold; }
+        .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .seccion-oculta { display: none; }
-        .badge-drenaje { background-color: #0d6efd; }
-        .badge-presion { background-color: #dc3545; }
-        .badge-glucosa { background-color: #ffc107; color: black; }
+        canvas { max-height: 250px; }
     </style>
 </head>
 <body>
@@ -30,95 +27,77 @@
 </nav>
 
 <div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8 text-center mb-4">
-            <div class="btn-group w-100">
-                <a href="{{ url_for('cargar_registro') }}" class="btn btn-primary">Cargar Datos</a>
-                <a href="{{ url_for('ver_registros') }}" class="btn btn-outline-primary">Ver Historial</a>
-            </div>
-        </div>
+    <div class="btn-group w-100 mb-4">
+        <a href="{{ url_for('cargar_registro') }}" class="btn btn-primary">Cargar Datos</a>
+        <a href="{{ url_for('ver_registros') }}" class="btn btn-outline-primary">Historial y Gráficos</a>
+    </div>
 
-        {% if modo == 'cargar' %}
+    {% if modo == 'cargar' %}
+    <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card p-4">
                 <h4 class="text-center mb-3">Nuevo Registro</h4>
-                
                 {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
-
                 <form action="{{ url_for('cargar_registro') }}" method="POST">
                     <div class="row g-3">
-                        <div class="col-6">
-                            <label class="form-label">Fecha</label>
-                            <input type="date" name="fecha" class="form-control" required>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Hora</label>
-                            <input type="time" name="hora" class="form-control" required>
-                        </div>
-
+                        <div class="col-6"><label>Fecha</label><input type="date" name="fecha" class="form-control" required></div>
+                        <div class="col-6"><label>Hora</label><input type="time" name="hora" class="form-control" required></div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">¿Qué vas a medir?</label>
-                            <select class="form-select form-select-lg" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
+                            <select class="form-select" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
                                 <option value="drenaje">💧 Drenaje</option>
                                 <option value="presion">❤️ Presión Arterial</option>
                                 <option value="glucosa">🩸 Glucosa</option>
                             </select>
                         </div>
-
                         <div id="campos_drenaje" class="row g-3 mt-1">
-                            <div class="col-6">
-                                <label class="form-label">Izq (ml)</label>
-                                <input type="number" step="0.1" name="cantidad_izq" class="form-control" placeholder="0.0">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label">Der (ml)</label>
-                                <input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="0.0">
-                            </div>
+                            <div class="col-6"><label>Izq (ml)</label><input type="number" step="0.1" name="cantidad_izq" class="form-control"></div>
+                            <div class="col-6"><label>Der (ml)</label><input type="number" step="0.1" name="cantidad_der" class="form-control"></div>
                         </div>
-
                         <div id="campos_presion" class="row g-3 mt-1 seccion-oculta">
-                            <div class="col-4">
-                                <label class="form-label">Sist. (Alta)</label>
-                                <input type="number" name="presion_alta" class="form-control" placeholder="120">
-                            </div>
-                            <div class="col-4">
-                                <label class="form-label">Diast. (Baja)</label>
-                                <input type="number" name="presion_baja" class="form-control" placeholder="80">
-                            </div>
-                            <div class="col-4">
-                                <label class="form-label">Pulso</label>
-                                <input type="number" name="pulso" class="form-control" placeholder="70">
-                            </div>
+                            <div class="col-4"><label>Alta</label><input type="number" name="presion_alta" class="form-control"></div>
+                            <div class="col-4"><label>Baja</label><input type="number" name="presion_baja" class="form-control"></div>
+                            <div class="col-4"><label>Pulso</label><input type="number" name="pulso" class="form-control"></div>
                         </div>
-
                         <div id="campos_glucosa" class="row g-3 mt-1 seccion-oculta">
-                            <div class="col-12">
-                                <label class="form-label">Nivel (mg/dL)</label>
-                                <input type="number" name="glucosa" class="form-control" placeholder="95">
-                            </div>
+                            <div class="col-12"><label>Glucosa (mg/dL)</label><input type="number" name="glucosa" class="form-control"></div>
                         </div>
-
-                        <div class="col-12 mt-3">
-                            <label class="form-label">Observaciones</label>
-                            <textarea name="observaciones" class="form-control" rows="2"></textarea>
-                        </div>
-
-                        <button type="submit" class="btn btn-success btn-custom w-100 mt-4">GUARDAR REGISTRO</button>
+                        <button type="submit" class="btn btn-success w-100 mt-4">GUARDAR</button>
                     </div>
                 </form>
             </div>
         </div>
-        {% endif %}
+    </div>
+    {% endif %}
 
-        {% if modo == 'ver' %}
+    {% if modo == 'ver' %}
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card p-3">
+                <h6 class="text-center text-primary">Drenaje (ml)</h6>
+                <canvas id="chartDrenaje"></canvas>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card p-3">
+                <h6 class="text-center text-danger">Pulso y Presión</h6>
+                <canvas id="chartPresion"></canvas>
+            </div>
+        </div>
+
         <div class="col-12">
-            <h4 class="text-center mb-3">Historial</h4>
+            <div class="card p-3">
+                <h6 class="text-center text-warning">Glucosa (mg/dL)</h6>
+                <canvas id="chartGlucosa"></canvas>
+            </div>
+        </div>
+
+        <div class="col-12 mt-4">
             <div class="table-responsive">
-                <table class="table table-hover bg-white rounded shadow-sm">
+                <table class="table table-sm table-hover bg-white rounded shadow-sm">
                     <thead class="table-dark">
                         <tr>
-                            <th>Fecha/Hora</th>
-                            <th>Tipo</th>
+                            <th>Fecha</th>
                             <th>Datos</th>
                             <th>Acción</th>
                         </tr>
@@ -126,64 +105,78 @@
                     <tbody>
                         {% for r in registros %}
                         <tr>
-                            <td>{{ r.fecha }} <br> <small>{{ r.hora }}</small></td>
+                            <td><small>{{ r.fecha }}</small></td>
                             <td>
                                 {% if r.cant_izq or r.cant_der %}
-                                    <span class="badge badge-drenaje">Drenaje</span>
+                                    I:{{ r.cant_izq or 0 }} D:{{ r.cant_der or 0 }}
                                 {% elif r.presion_alta %}
-                                    <span class="badge badge-presion">Presión</span>
-                                {% else %}
-                                    <span class="badge badge-glucosa">Glucosa</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if r.cant_izq or r.cant_der %}
-                                    Izq: {{ r.cant_izq or 0 }} | Der: {{ r.cant_der or 0 }}
-                                {% elif r.presion_alta %}
-                                    {{ r.presion_alta }}/{{ r.presion_baja }} - P: {{ r.pulso }}
+                                    {{ r.presion_alta }}/{{ r.presion_baja }} ({{ r.pulso }})
                                 {% else %}
                                     {{ r.glucosa }} mg/dL
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{{ url_for('borrar', id=r.id) }}" 
-                                   class="btn btn-danger btn-sm" 
-                                   onclick="return confirm('¿Estás seguro de que quieres borrar este registro?');">
-                                   🗑️
-                                </a>
+                                <a href="{{ url_for('borrar', id=r.id) }}" class="btn btn-link btn-sm text-danger" onclick="return confirm('¿Borrar registro?');">🗑️</a>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            <a href="{{ url_for('ver_registros') }}" class="btn btn-secondary w-100 mt-2">Actualizar</a>
         </div>
-        {% endif %}
     </div>
+
+    <script>
+        const config = { responsive: true, maintainAspectRatio: false };
+
+        // Datos para Drenaje
+        const labelsDrenaje = [{% for r in registros|reverse %}{% if r.cant_izq or r.cant_der %}"{{r.fecha}}",{% endif %}{% endfor %}];
+        new Chart(document.getElementById('chartDrenaje'), {
+            type: 'line',
+            data: {
+                labels: labelsDrenaje,
+                datasets: [
+                    { label: 'Izq', data: [{% for r in registros|reverse %}{% if r.cant_izq or r.cant_der %}{{r.cant_izq or 0}},{% endif %}{% endfor %}], borderColor: '#0d6efd' },
+                    { label: 'Der', data: [{% for r in registros|reverse %}{% if r.cant_izq or r.cant_der %}{{r.cant_der or 0}},{% endif %}{% endfor %}], borderColor: '#6c757d' }
+                ]
+            }, options: config
+        });
+
+        // Datos para Presión y Pulso
+        const labelsPresion = [{% for r in registros|reverse %}{% if r.presion_alta %}"{{r.fecha}}",{% endif %}{% endfor %}];
+        new Chart(document.getElementById('chartPresion'), {
+            type: 'line',
+            data: {
+                labels: labelsPresion,
+                datasets: [
+                    { label: 'Alta', data: [{% for r in registros|reverse %}{% if r.presion_alta %}{{r.presion_alta}},{% endif %}{% endfor %}], borderColor: '#dc3545' },
+                    { label: 'Pulso', data: [{% for r in registros|reverse %}{% if r.pulso %}{{r.pulso}},{% endif %}{% endfor %}], borderColor: '#ffc107' }
+                ]
+            }, options: config
+        });
+
+        // Datos para Glucosa
+        const labelsGlucosa = [{% for r in registros|reverse %}{% if r.glucosa %}"{{r.fecha}}",{% endif %}{% endfor %}];
+        new Chart(document.getElementById('chartGlucosa'), {
+            type: 'line',
+            data: {
+                labels: labelsGlucosa,
+                datasets: [
+                    { label: 'Glucosa', data: [{% for r in registros|reverse %}{% if r.glucosa %}{{r.glucosa}},{% endif %}{% endfor %}], borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', fill: true }
+                ]
+            }, options: config
+        });
+    </script>
+    {% endif %}
 </div>
 
 <script>
-function mostrarCampos() {
-    const tipo = document.getElementById('tipo_registro').value;
-    document.getElementById('campos_drenaje').classList.add('seccion-oculta');
-    document.getElementById('campos_presion').classList.add('seccion-oculta');
-    document.getElementById('campos_glucosa').classList.add('seccion-oculta');
-
-    if (tipo === 'drenaje') document.getElementById('campos_drenaje').classList.remove('seccion-oculta');
-    if (tipo === 'presion') document.getElementById('campos_presion').classList.remove('seccion-oculta');
-    if (tipo === 'glucosa') document.getElementById('campos_glucosa').classList.remove('seccion-oculta');
-}
-
-// Registro del Service Worker para que la PWA sea instalable
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/sw.js')
-            .then(reg => console.log('SW registrado'))
-            .catch(err => console.log('Error SW', err));
-    });
-}
+    function mostrarCampos() {
+        const tipo = document.getElementById('tipo_registro').value;
+        document.getElementById('campos_drenaje').classList.toggle('seccion-oculta', tipo !== 'drenaje');
+        document.getElementById('campos_presion').classList.toggle('seccion-oculta', tipo !== 'presion');
+        document.getElementById('campos_glucosa').classList.toggle('seccion-oculta', tipo !== 'glucosa');
+    }
 </script>
-
 </body>
 </html>
