@@ -128,7 +128,7 @@
                         <tr>
                             <td>{{ r.fecha }} <br> <small>{{ r.hora }}</small></td>
                             <td>
-                                {% if r.cantidad_izq or r.cantidad_der %}
+                                {% if r.cant_izq or r.cant_der %}
                                     <span class="badge badge-drenaje">Drenaje</span>
                                 {% elif r.presion_alta %}
                                     <span class="badge badge-presion">Presión</span>
@@ -137,8 +137,8 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if r.cantidad_izq or r.cantidad_der %}
-                                    Izq: {{ r.cantidad_izq }} | Der: {{ r.cantidad_der }}
+                                {% if r.cant_izq or r.cant_der %}
+                                    Izq: {{ r.cant_izq or 0 }} | Der: {{ r.cant_der or 0 }}
                                 {% elif r.presion_alta %}
                                     {{ r.presion_alta }}/{{ r.presion_baja }} - P: {{ r.pulso }}
                                 {% else %}
@@ -157,7 +157,7 @@
                     </tbody>
                 </table>
             </div>
-            <a href="{{ url_for('descargar_pdf') }}" class="btn btn-secondary w-100">Descargar PDF</a>
+            <a href="{{ url_for('ver_registros') }}" class="btn btn-secondary w-100 mt-2">Actualizar</a>
         </div>
         {% endif %}
     </div>
@@ -175,12 +175,12 @@ function mostrarCampos() {
     if (tipo === 'glucosa') document.getElementById('campos_glucosa').classList.remove('seccion-oculta');
 }
 
-// Registro del Service Worker para PWA
+// Registro del Service Worker para que la PWA sea instalable
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/static/sw.js')
-            .then(reg => console.log('Service Worker registrado correctamente'))
-            .catch(err => console.error('Error al registrar Service Worker', err));
+            .then(reg => console.log('SW registrado'))
+            .catch(err => console.log('Error SW', err));
     });
 }
 </script>
