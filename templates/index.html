@@ -4,18 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Salud - Mauro</title>
-    
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#0d6efd">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <style>
         body { background-color: #f4f7f6; }
         .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .seccion-oculta { display: none; }
         canvas { max-height: 280px; }
-        .table-sm td, .table-sm th { font-size: 0.85rem; }
     </style>
 </head>
 <body>
@@ -62,6 +59,7 @@
                         <div id="campos_glucosa" class="row g-3 mt-1 seccion-oculta">
                             <div class="col-12"><label>Glucosa (mg/dL)</label><input type="number" name="glucosa" class="form-control"></div>
                         </div>
+                        <div class="col-12"><label>Observaciones</label><textarea name="observaciones" class="form-control"></textarea></div>
                         <button type="submit" class="btn btn-success w-100 mt-4 fw-bold">GUARDAR REGISTRO</button>
                     </div>
                 </form>
@@ -72,55 +70,36 @@
 
     {% if modo == 'ver' %}
     <div class="row">
-        <div class="col-12">
-            <div class="card p-3">
-                <h6 class="text-center text-primary">Evolución de Drenaje (ml)</h6>
-                <canvas id="chartDrenaje"></canvas>
-            </div>
-        </div>
+        <div class="col-12"><div class="card p-3"><h6 class="text-center text-primary">Drenaje (ml)</h6><canvas id="chartDrenaje"></canvas></div></div>
+        <div class="col-12"><div class="card p-3"><h6 class="text-center text-danger">Presión y Pulso</h6><canvas id="chartPresion"></canvas></div></div>
+        <div class="col-12"><div class="card p-3"><h6 class="text-center text-success">Glucosa</h6><canvas id="chartGlucosa"></canvas></div></div>
 
-        <div class="col-12">
-            <div class="card p-3">
-                <h6 class="text-center text-danger">Presión Arterial y Pulso</h6>
-                <canvas id="chartPresion"></canvas>
-            </div>
-        </div>
-
-        <div class="col-12">
-            <div class="card p-3">
-                <h6 class="text-center text-success">Niveles de Glucosa</h6>
-                <canvas id="chartGlucosa"></canvas>
+        <div class="col-12 mb-4">
+            <div class="card p-3 text-center border-primary">
+                <h6 class="mb-3">📄 Descargar Reporte para el Médico</h6>
+                <div class="btn-group w-100">
+                    <a href="{{ url_for('descargar_pdf', dias=7) }}" class="btn btn-outline-primary">7 días</a>
+                    <a href="{{ url_for('descargar_pdf', dias=15) }}" class="btn btn-outline-primary">15 días</a>
+                    <a href="{{ url_for('descargar_pdf', dias=30) }}" class="btn btn-outline-primary">30 días</a>
+                </div>
             </div>
         </div>
 
         <div class="col-12">
             <div class="card p-2">
-                <h6 class="text-center p-2">Historial de Registros</h6>
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover bg-white">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Datos</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
+                    <table class="table table-sm table-hover">
+                        <thead class="table-dark"><tr><th>Fecha</th><th>Datos</th><th>Acción</th></tr></thead>
                         <tbody>
                             {% for r in registros %}
                             <tr>
                                 <td><small>{{ r.fecha }}</small></td>
                                 <td>
-                                    {% if r.cant_izq or r.cant_der %}
-                                        I:{{ r.cant_izq or 0 }} | D:{{ r.cant_der or 0 }}
-                                    {% elif r.presion_alta %}
-                                        {{ r.presion_alta }}/{{ r.presion_baja }} <small>(P:{{ r.pulso }})</small>
-                                    {% else %}
-                                        {{ r.glucosa }} mg/dL
-                                    {% endif %}
+                                    {% if r.cant_izq or r.cant_der %} I:{{ r.cant_izq or 0 }}|D:{{ r.cant_der or 0 }}
+                                    {% elif r.presion_alta %} {{ r.presion_alta }}/{{ r.presion_baja }} <small>({{ r.pulso }})</small>
+                                    {% else %} {{ r.glucosa }} mg/dL {% endif %}
                                 </td>
-                                <td>
-                                    <a href="{{ url_for('borrar', id=r.id) }}" class="btn btn-link btn-sm text-danger p-0" onclick="return confirm('¿Estás seguro de borrar este registro?');">🗑️</a>
-                                </td>
+                                <td><a href="{{ url_for('borrar', id=r.id) }}" class="btn btn-link btn-sm text-danger p-0" onclick="return confirm('¿Borrar?');">🗑️</a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -131,50 +110,36 @@
     </div>
 
     <script>
-        const configBase = { 
-            responsive: true, 
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } }
-        };
-
-        // --- DRENAJE ---
+        const configBase = { responsive: true, maintainAspectRatio: false };
+        // Drenaje
         new Chart(document.getElementById('chartDrenaje'), {
             type: 'line',
             data: {
                 labels: [{% for r in registros|reverse %}{% if r.cant_izq or r.cant_der %}"{{r.fecha}}",{% endif %}{% endfor %}],
                 datasets: [
-                    { label: 'Izq', data: [{% for r in registros|reverse %}{% if r.cant_izq or r.cant_der %}{{r.cant_izq or 0}},{% endif %}{% endfor %}], borderColor: '#0d6efd', tension: 0.3 },
-                    { label: 'Der', data: [{% for r in registros|reverse %}{% if r.cant_izq or r.cant_der %}{{r.cant_der or 0}},{% endif %}{% endfor %}], borderColor: '#6c757d', tension: 0.3 }
+                    { label: 'Izq', data: [{% for r in registros|reverse %}{% if r.cant_izq or r.cant_der %}{{r.cant_izq or 0}},{% endif %}{% endfor %}], borderColor: '#0d6efd' },
+                    { label: 'Der', data: [{% for r in registros|reverse %}{% if r.cant_izq or r.cant_der %}{{r.cant_der or 0}},{% endif %}{% endfor %}], borderColor: '#6c757d' }
                 ]
             }, options: configBase
         });
-
-        // --- PRESIÓN Y PULSO (Doble Eje) ---
+        // Presión (Doble Eje)
         new Chart(document.getElementById('chartPresion'), {
             type: 'line',
             data: {
                 labels: [{% for r in registros|reverse %}{% if r.presion_alta %}"{{r.fecha}}",{% endif %}{% endfor %}],
                 datasets: [
                     { label: 'Alta', data: [{% for r in registros|reverse %}{% if r.presion_alta %}{{r.presion_alta}},{% endif %}{% endfor %}], borderColor: '#dc3545', yAxisID: 'y' },
-                    { label: 'Baja', data: [{% for r in registros|reverse %}{% if r.presion_baja %}{{r.presion_baja}},{% endif %}{% endfor %}], borderColor: '#0d6efd', yAxisID: 'y' },
-                    { label: 'Pulso', data: [{% for r in registros|reverse %}{% if r.pulso %}{{r.pulso}},{% endif %}{% endfor %}], borderColor: '#ffc107', borderDash: [5,5], yAxisID: 'y1' }
+                    { label: 'Pulso', data: [{% for r in registros|reverse %}{% if r.pulso %}{{r.pulso}},{% endif %}{% endfor %}], borderColor: '#ffc107', yAxisID: 'y1', borderDash: [5,5] }
                 ]
             },
-            options: {
-                ...configBase,
-                scales: {
-                    y: { type: 'linear', position: 'left', title: { display: true, text: 'Presión' } },
-                    y1: { type: 'linear', position: 'right', title: { display: true, text: 'Pulso' }, grid: { drawOnChartArea: false } }
-                }
-            }
+            options: { ...configBase, scales: { y: { position: 'left' }, y1: { position: 'right', grid: { drawOnChartArea: false } } } }
         });
-
-        // --- GLUCOSA ---
+        // Glucosa
         new Chart(document.getElementById('chartGlucosa'), {
             type: 'line',
             data: {
                 labels: [{% for r in registros|reverse %}{% if r.glucosa %}"{{r.fecha}}",{% endif %}{% endfor %}],
-                datasets: [{ label: 'Glucosa', data: [{% for r in registros|reverse %}{% if r.glucosa %}{{r.glucosa}},{% endif %}{% endfor %}], borderColor: '#198754', backgroundColor: 'rgba(25,135,84,0.1)', fill: true, tension: 0.3 }]
+                datasets: [{ label: 'Glucosa', data: [{% for r in registros|reverse %}{% if r.glucosa %}{{r.glucosa}},{% endif %}{% endfor %}], borderColor: '#198754' }]
             }, options: configBase
         });
     </script>
@@ -183,10 +148,10 @@
 
 <script>
     function mostrarCampos() {
-        const tipo = document.getElementById('tipo_registro').value;
-        document.getElementById('campos_drenaje').classList.toggle('seccion-oculta', tipo !== 'drenaje');
-        document.getElementById('campos_presion').classList.toggle('seccion-oculta', tipo !== 'presion');
-        document.getElementById('campos_glucosa').classList.toggle('seccion-oculta', tipo !== 'glucosa');
+        const t = document.getElementById('tipo_registro').value;
+        document.getElementById('campos_drenaje').classList.toggle('seccion-oculta', t !== 'drenaje');
+        document.getElementById('campos_presion').classList.toggle('seccion-oculta', t !== 'presion');
+        document.getElementById('campos_glucosa').classList.toggle('seccion-oculta', t !== 'glucosa');
     }
     if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js'); }
 </script>
