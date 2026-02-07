@@ -195,7 +195,7 @@ def descargar_pdf():
         val = ""
         if r['tipo'] == 'presion': val = f"{r['presion_alta']}/{r['presion_baja']} - Pulso: {r['pulso']}"
         elif r['tipo'] == 'glucosa': val = f"{r['glucosa']} mg/dL"
-        elif r['tipo'] == 'oxigeno': val = f"{r['oxigeno']}%"
+        elif r['tipo'] == 'oxigeno': val = f"{r['oxigeno']}% Sat."
         elif r['tipo'] == 'temperatura': val = f"{r['temperatura']} °C"
         elif r['tipo'] == 'drenaje': val = f"I: {r['cant_izq']}ml | D: {r['cant_der']}ml"
         c.drawString(220, y, val)
