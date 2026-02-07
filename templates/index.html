@@ -84,9 +84,18 @@
     <div class="card p-3 mb-3 bg-light border-0">
         <h6 class="fw-bold small mb-2">🖨️ Generar Reporte PDF</h6>
         <form action="{{ url_for('descargar_pdf') }}" method="POST" class="row g-2">
-            <div class="col-6"><select name="tipo_reporte" class="form-select form-select-sm"><option value="todos">Todo</option><option value="presion">Presión</option><option value="glucosa">Glucosa</option><option value="drenaje">Drenajes</option></select></div>
+            <div class="col-6">
+                <select name="tipo_reporte" class="form-select form-select-sm">
+                    <option value="todos">Todo</option>
+                    <option value="presion">Presión</option>
+                    <option value="glucosa">Glucosa</option>
+                    <option value="oxigeno">Oxígeno</option>
+                    <option value="temperatura">Temperatura</option>
+                    <option value="drenaje">Drenajes</option>
+                </select>
+            </div>
             <div class="col-6"><select name="periodo" class="form-select form-select-sm"><option value="7">7 días</option><option value="15">15 días</option><option value="30" selected>30 días</option></select></div>
-            <button type="submit" class="btn btn-dark w-100 btn-sm fw-bold">DESCARGAR</button>
+            <button type="submit" class="btn btn-dark w-100 btn-sm fw-bold">DESCARGAR PDF</button>
         </form>
     </div>
     <div class="text-center mb-3"><span class="badge bg-secondary">⚖️ Peso: {{stats.peso_actual}} kg</span></div>
@@ -100,8 +109,8 @@
     <div class="collapse" id="boxHistorial">
         <div class="card overflow-hidden"><div class="table-responsive"><table class="table table-hover mb-0"><tbody style="font-size: 0.8rem;">
             {% for r in registros %}<tr><td class="ps-3"><div>{{r.fecha}}</div><div class="text-muted small">{{r.hora}}</div></td><td class="fw-bold">{{r.tipo[:4]|upper}}</td><td>
-                {% if r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}}{% elif r.tipo == 'glucosa' %}{{r.glucosa}}{% elif r.tipo == 'drenaje' %}I:{{r.cant_izq}}|D:{{r.cant_der}}{% else %}{{r.oxigeno or r.temperatura}}{% endif %}
-            </td><td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger">🗑️</a></td></tr>{% endfor %}
+                {% if r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}}{% elif r.tipo == 'glucosa' %}{{r.glucosa}}{% elif r.tipo == 'drenaje' %}I:{{r.cant_izq}}|D:{{r.cant_der}}{% elif r.tipo == 'oxigeno' %}{{r.oxigeno}}%{% elif r.tipo == 'temperatura' %}{{r.temperatura}}°{% endif %}
+            </td><td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Borrar registro?')">🗑️</a></td></tr>{% endfor %}
         </tbody></table></div></div>
     </div>
     {% endif %}
