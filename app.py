@@ -23,22 +23,28 @@ def conectar():
 def inicializar_sistema():
     try:
         conn = conectar(); cur = conn.cursor()
+        # Crear tablas básicas
         cur.execute("CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, usuario VARCHAR(50) UNIQUE, password TEXT);")
         cur.execute("""CREATE TABLE IF NOT EXISTS perfil (
             id SERIAL PRIMARY KEY, usuario VARCHAR(50) UNIQUE, nombre_apellido VARCHAR(100),
             edad INTEGER, sexo VARCHAR(20), peso DECIMAL(5,2), nombre_medico VARCHAR(100), obra_social VARCHAR(100)
         );""")
-        # Añadimos columnas oxigeno y temperatura si no existen
         cur.execute("""CREATE TABLE IF NOT EXISTS registros (
             id SERIAL PRIMARY KEY, fecha DATE, hora TIME, tipo VARCHAR(50), 
             cant_izq DECIMAL(5,2), cant_der DECIMAL(5,2), presion_alta INTEGER, 
-            presion_baja INTEGER, pulso INTEGER, glucosa INTEGER, 
-            oxigeno INTEGER, temperatura DECIMAL(4,1),
-            observaciones TEXT, usuario VARCHAR(50)
+            presion_baja INTEGER, pulso INTEGER, glucosa INTEGER, observaciones TEXT, usuario VARCHAR(50)
         );""")
+        
+        # --- ESTO ARREGLA EL ERROR: Agrega las columnas nuevas si no existen ---
+        cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS oxigeno INTEGER;")
+        cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS temperatura DECIMAL(4,1);")
+        
         conn.commit(); cur.close(); conn.close()
-    except Exception as e: print(f"Error inicializando: {e}")
+        print("Base de datos actualizada con éxito.")
+    except Exception as e: 
+        print(f"Error inicializando: {e}")
 
+# Se ejecuta al arrancar la app
 inicializar_sistema()
 
 @app.route("/", methods=["GET", "POST"])
@@ -106,7 +112,7 @@ def cargar_registro():
              request.form.get("oxigeno") or None, request.form.get("temperatura") or None,
              request.form.get("observaciones"), session["usuario"]))
         conn.commit(); cur.close(); conn.close()
-        success = "✅ Guardado"
+        success = "✅ Guardado correctamente"
     return render_template("index.html", modo="cargar", success=success, usuario=session["usuario"])
 
 @app.route("/ver")
@@ -134,7 +140,7 @@ def descargar_pdf():
     regs = cur.fetchall(); cur.close(); conn.close()
     buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=letter)
     
-    c.setFont("Helvetica-Bold", 14); c.drawString(50, 760, "REPORTE DE SALUD - FICHA MÉDICA")
+    c.setFont("Helvetica-Bold", 14); c.drawString(50, 760, "REPORTE DE SALUD - MAURO")
     c.setFont("Helvetica", 10)
     if p:
         c.drawString(50, 740, f"Paciente: {p['nombre_apellido']} | OS: {p['obra_social']}")
@@ -147,19 +153,20 @@ def descargar_pdf():
         if r['tipo'] == 'drenaje': txt += f"I:{r['cant_izq']}ml D:{r['cant_der']}ml"
         elif r['tipo'] == 'presion': txt += f"P:{r['presion_alta']}/{r['presion_baja']} Pulso:{r['pulso']}"
         elif r['tipo'] == 'glucosa': txt += f"G:{r['glucosa']}mg/dL"
-        elif r['tipo'] == 'oxigeno': txt += f"Sat O2:{r['oxigeno']}%"
-        elif r['tipo'] == 'temperatura': txt += f"Temp:{r['temperatura']}°C"
+        elif r['tipo'] == 'oxigeno': txt += f"O2:{r['oxigeno']}%"
+        elif r['tipo'] == 'temperatura': txt += f"Temp:{r['temperatura']}C"
         c.drawString(50, y, txt)
         y -= 20
         
     c.save(); buf.seek(0)
     resp = make_response(buf.read())
     resp.headers['Content-Type'] = 'application/pdf'
-    resp.headers['Content-Disposition'] = f'attachment; filename=Reporte_Mauro.pdf'
+    resp.headers['Content-Disposition'] = f'attachment; filename=Reporte_Salud.pdf'
     return resp
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
+    if "usuario" not in session: return redirect(url_for("login"))
     conn = conectar(); cur = conn.cursor()
     cur.execute("DELETE FROM registros WHERE id = %s AND usuario = %s", (id, session["usuario"]))
     conn.commit(); cur.close(); conn.close()
