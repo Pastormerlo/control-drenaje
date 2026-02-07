@@ -120,7 +120,10 @@ def descargar_pdf():
         
         conn = conectar()
         cur = conn.cursor(cursor_factory=DictCursor)
-        cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s ORDER BY fecha DESC, hora DESC", 
+        # ACÁ ESTÁ EL CAMBIO: agregamos ::date para convertir el texto a fecha
+        cur.execute("""SELECT * FROM registros 
+                       WHERE usuario = %s AND fecha::date >= %s 
+                       ORDER BY fecha DESC, hora DESC""", 
                     (session["usuario"], fecha_limite.date()))
         registros = cur.fetchall()
         cur.close()
@@ -148,10 +151,8 @@ def descargar_pdf():
                 c.showPage()
                 y = 750
             
-            # Fecha y Hora
             c.drawString(50, y, f"{r['fecha']}")
             
-            # Tipo y Valores
             tipo = "Glucosa"
             valores = f"{r['glucosa']} mg/dL"
             if r['cant_izq'] or r['cant_der']:
@@ -164,7 +165,6 @@ def descargar_pdf():
             c.drawString(130, y, tipo)
             c.drawString(210, y, valores)
             
-            # Observaciones (si existen)
             if r['observaciones']:
                 y -= 12
                 c.setFont("Helvetica-Oblique", 8)
