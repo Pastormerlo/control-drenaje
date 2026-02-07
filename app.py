@@ -1,12 +1,9 @@
 import os
 import psycopg2
 from psycopg2.extras import DictCursor
-from flask import Flask, render_template, request, redirect, url_for, session, flash, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
-import io
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave-segura-mauro-2026")
@@ -86,7 +83,7 @@ def cargar_registro():
              request.form.get("oxigeno") or None, request.form.get("temperatura") or None,
              request.form.get("observaciones"), session["usuario"]))
         conn.commit(); cur.close(); conn.close()
-        success = "✅ Datos guardados"
+        success = "✅ Registro guardado"
     return render_template("index.html", modo="cargar", success=success, usuario=session["usuario"])
 
 @app.route("/ver")
@@ -133,17 +130,15 @@ def ver_registros():
             if v < stats['temp']['min']: stats['temp']['min'] = v
             if v >= 37.5: stats['temp']['alertas'] += 1
 
-    # Limpieza final de promedios
+    # Limpieza de cálculos
     if stats['glucosa']['count'] > 0: stats['glucosa']['prom'] //= stats['glucosa']['count']
     else: stats['glucosa']['min'] = 0
     if stats['presion']['count'] > 0:
         stats['presion']['prom_a'] //= stats['presion']['count']; stats['presion']['prom_b'] //= stats['presion']['count']
         stats['pulso']['prom'] //= stats['presion']['count']
-    else: stats['presion']['min_a'] = 0
     if stats['oxigeno']['count'] > 0: stats['oxigeno']['prom'] //= stats['oxigeno']['count']
     else: stats['oxigeno']['min'] = 0
     if stats['temp']['count'] > 0: stats['temp']['prom'] = round(stats['temp']['prom'] / stats['temp']['count'], 1)
-    else: stats['temp']['min'] = 0
 
     cur.close(); conn.close()
     return render_template("index.html", registros=regs, stats=stats, modo="ver", usuario=session["usuario"])
