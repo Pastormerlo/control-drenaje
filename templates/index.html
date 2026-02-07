@@ -20,7 +20,7 @@
     <div class="container">
         <span class="navbar-brand fw-bold">Mauro Salud</span>
         <div>
-            <a href="{{ url_for('editar_perfil') }}" class="btn btn-sm btn-outline-light">Perfil</a>
+            <a href="{{ url_for('editar_perfil') }}" class="btn btn-sm btn-outline-light">Mi Ficha</a>
             <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Salir</a>
         </div>
     </div>
@@ -31,6 +31,24 @@
         <a href="{{ url_for('cargar_registro') }}" class="btn btn-white py-2 {% if modo=='cargar' %}active btn-primary text-white{% endif %}">➕ Cargar</a>
         <a href="{{ url_for('ver_registros') }}" class="btn btn-white py-2 {% if modo=='ver' %}active btn-primary text-white{% endif %}">📊 Indicadores</a>
     </div>
+
+    {% if modo == 'perfil' %}
+    <div class="card p-4">
+        <h5 class="mb-4">Mi Ficha Individual</h5>
+        {% if get_flashed_messages() %}<div class="alert alert-success">{{ get_flashed_messages()[0] }}</div>{% endif %}
+        <form action="{{ url_for('editar_perfil') }}" method="POST">
+            <div class="row g-3">
+                <div class="col-12"><label class="small fw-bold">Nombre y Apellido</label><input type="text" name="nombre" class="form-control" value="{{perfil.nombre_apellido or ''}}" required></div>
+                <div class="col-6"><label class="small fw-bold">Edad</label><input type="number" name="edad" class="form-control" value="{{perfil.edad or ''}}"></div>
+                <div class="col-6"><label class="small fw-bold">Sexo</label><select name="sexo" class="form-select"><option value="M" {% if perfil.sexo=='M' %}selected{% endif %}>M</option><option value="F" {% if perfil.sexo=='F' %}selected{% endif %}>F</option></select></div>
+                <div class="col-6"><label class="small fw-bold">Peso (kg)</label><input type="number" step="0.1" name="peso" class="form-control" value="{{perfil.peso or ''}}"></div>
+                <div class="col-12"><label class="small fw-bold">Obra Social</label><input type="text" name="obra_social" class="form-control" value="{{perfil.obra_social or ''}}"></div>
+                <div class="col-12"><label class="small fw-bold">Médico de Cabecera</label><input type="text" name="medico" class="form-control" value="{{perfil.nombre_medico or ''}}"></div>
+                <button type="submit" class="btn btn-success w-100 p-3 fw-bold">ACTUALIZAR FICHA</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
 
     {% if modo == 'cargar' %}
     <div class="card p-4">
@@ -60,7 +78,6 @@
                 </div>
                 <div id="campos_oxigeno" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" name="oxigeno" class="form-control" placeholder="Sat %"></div></div>
                 <div id="campos_temperatura" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" step="0.1" name="temperatura" class="form-control" placeholder="Temp °C"></div></div>
-                
                 <div class="col-12"><textarea name="observaciones" class="form-control" rows="2" placeholder="Notas..."></textarea></div>
                 <button type="submit" class="btn btn-primary w-100 p-3 fw-bold mt-3">GUARDAR DATOS</button>
             </div>
@@ -94,7 +111,6 @@
                 </div>
             </div>
         </div>
-
         <div class="col-12 col-md-6">
             <div class="card p-3 border-start border-danger border-4">
                 <div class="stat-label">Presión Promedio</div>
@@ -115,12 +131,7 @@
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="bg-light">
-                    <tr class="small text-muted">
-                        <th>FECHA</th>
-                        <th>TIPO</th>
-                        <th>VALOR</th>
-                        <th></th>
-                    </tr>
+                    <tr class="small text-muted"><th>FECHA</th><th>TIPO</th><th>VALOR</th><th></th></tr>
                 </thead>
                 <tbody class="small">
                     {% for r in registros %}
