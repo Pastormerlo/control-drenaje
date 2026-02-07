@@ -34,8 +34,6 @@ def inicializar_sistema():
             presion_baja INTEGER, pulso INTEGER, glucosa INTEGER, 
             oxigeno INTEGER, temperatura DECIMAL(4,1), observaciones TEXT, usuario VARCHAR(50)
         );""")
-        cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS oxigeno INTEGER;")
-        cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS temperatura DECIMAL(4,1);")
         conn.commit(); cur.close(); conn.close()
     except Exception as e: print(f"Error inicializando: {e}")
 
@@ -88,7 +86,7 @@ def cargar_registro():
              request.form.get("oxigeno") or None, request.form.get("temperatura") or None,
              request.form.get("observaciones"), session["usuario"]))
         conn.commit(); cur.close(); conn.close()
-        success = "✅ Registro guardado"
+        success = "✅ Datos guardados"
     return render_template("index.html", modo="cargar", success=success, usuario=session["usuario"])
 
 @app.route("/ver")
@@ -104,10 +102,10 @@ def ver_registros():
     
     stats = {
         'glucosa': {'prom':0, 'max':0, 'min':999, 'alertas':0, 'count':0},
-        'presion': {'prom_a':0, 'prom_b':0, 'alertas':0, 'count':0},
+        'presion': {'prom_a':0, 'prom_b':0, 'max_a':0, 'min_a':999, 'alertas':0, 'count':0},
         'pulso': {'prom':0},
-        'oxigeno': {'prom':0, 'min':100, 'alertas':0, 'count':0},
-        'temp': {'prom':0, 'max':0, 'alertas':0, 'count':0}
+        'oxigeno': {'prom':0, 'max':0, 'min':100, 'alertas':0, 'count':0},
+        'temp': {'prom':0, 'max':0, 'min':99, 'alertas':0, 'count':0}
     }
     
     for r in r_stats:
@@ -118,27 +116,34 @@ def ver_registros():
             if v > 140 or v < 70: stats['glucosa']['alertas'] += 1
         elif r['tipo'] == 'presion':
             if r['presion_alta'] and r['presion_baja']:
-                stats['presion']['count'] += 1; stats['presion']['prom_a'] += r['presion_alta']; stats['presion']['prom_b'] += r['presion_baja']
+                stats['presion']['count'] += 1
+                stats['presion']['prom_a'] += r['presion_alta']; stats['presion']['prom_b'] += r['presion_baja']
+                if r['presion_alta'] > stats['presion']['max_a']: stats['presion']['max_a'] = r['presion_alta']
+                if r['presion_alta'] < stats['presion']['min_a']: stats['presion']['min_a'] = r['presion_alta']
                 if r['presion_alta'] >= 140 or r['presion_baja'] >= 90: stats['presion']['alertas'] += 1
             if r['pulso']: stats['pulso']['prom'] += r['pulso']
         elif r['tipo'] == 'oxigeno' and r['oxigeno']:
             v = r['oxigeno']; stats['oxigeno']['count'] += 1; stats['oxigeno']['prom'] += v
+            if v > stats['oxigeno']['max']: stats['oxigeno']['max'] = v
             if v < stats['oxigeno']['min']: stats['oxigeno']['min'] = v
             if v < 95: stats['oxigeno']['alertas'] += 1
         elif r['tipo'] == 'temperatura' and r['temperatura']:
             v = float(r['temperatura']); stats['temp']['count'] += 1; stats['temp']['prom'] += v
             if v > stats['temp']['max']: stats['temp']['max'] = v
+            if v < stats['temp']['min']: stats['temp']['min'] = v
             if v >= 37.5: stats['temp']['alertas'] += 1
 
+    # Limpieza final de promedios
     if stats['glucosa']['count'] > 0: stats['glucosa']['prom'] //= stats['glucosa']['count']
     else: stats['glucosa']['min'] = 0
     if stats['presion']['count'] > 0:
-        stats['presion']['prom_a'] //= stats['presion']['count']
-        stats['presion']['prom_b'] //= stats['presion']['count']
+        stats['presion']['prom_a'] //= stats['presion']['count']; stats['presion']['prom_b'] //= stats['presion']['count']
         stats['pulso']['prom'] //= stats['presion']['count']
+    else: stats['presion']['min_a'] = 0
     if stats['oxigeno']['count'] > 0: stats['oxigeno']['prom'] //= stats['oxigeno']['count']
     else: stats['oxigeno']['min'] = 0
     if stats['temp']['count'] > 0: stats['temp']['prom'] = round(stats['temp']['prom'] / stats['temp']['count'], 1)
+    else: stats['temp']['min'] = 0
 
     cur.close(); conn.close()
     return render_template("index.html", registros=regs, stats=stats, modo="ver", usuario=session["usuario"])
@@ -154,8 +159,7 @@ def editar_perfil():
             peso=EXCLUDED.peso, nombre_medico=EXCLUDED.nombre_medico, obra_social=EXCLUDED.obra_social""",
             (session["usuario"], request.form.get("nombre"), request.form.get("edad"), 
              request.form.get("sexo"), request.form.get("peso"), request.form.get("medico"), request.form.get("obra_social")))
-        conn.commit()
-        flash("Ficha actualizada con éxito", "success")
+        conn.commit(); flash("Ficha actualizada", "success")
     cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
     perfil = cur.fetchone()
     cur.close(); conn.close()
