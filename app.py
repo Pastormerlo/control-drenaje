@@ -91,7 +91,6 @@ def ver_registros():
     if "usuario" not in session: return redirect(url_for("login"))
     conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
     
-    # Obtener perfil para el peso actual
     cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
     perfil = cur.fetchone()
     
@@ -116,13 +115,12 @@ def ver_registros():
             if v > stats['glucosa']['max']: stats['glucosa']['max'] = v
             if v < stats['glucosa']['min']: stats['glucosa']['min'] = v
             if v > 140 or v < 70: stats['glucosa']['alertas'] += 1
-        elif r['tipo'] == 'presion':
-            if r['presion_alta'] and r['presion_baja']:
-                stats['presion']['count'] += 1
-                stats['presion']['prom_a'] += r['presion_alta']; stats['presion']['prom_b'] += r['presion_baja']
-                if r['presion_alta'] > stats['presion']['max_a']: stats['presion']['max_a'] = r['presion_alta']
-                if r['presion_alta'] < stats['presion']['min_a']: stats['presion']['min_a'] = r['presion_alta']
-                if r['presion_alta'] >= 140 or r['presion_baja'] >= 90: stats['presion']['alertas'] += 1
+        elif r['tipo'] == 'presion' and r['presion_alta'] and r['presion_baja']:
+            stats['presion']['count'] += 1
+            stats['presion']['prom_a'] += r['presion_alta']; stats['presion']['prom_b'] += r['presion_baja']
+            if r['presion_alta'] > stats['presion']['max_a']: stats['presion']['max_a'] = r['presion_alta']
+            if r['presion_alta'] < stats['presion']['min_a']: stats['presion']['min_a'] = r['presion_alta']
+            if r['presion_alta'] >= 140 or r['presion_baja'] >= 90: stats['presion']['alertas'] += 1
         elif r['tipo'] == 'oxigeno' and r['oxigeno']:
             v = r['oxigeno']; stats['oxigeno']['count'] += 1; stats['oxigeno']['prom'] += v
             if v < stats['oxigeno']['min']: stats['oxigeno']['min'] = v
