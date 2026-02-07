@@ -28,10 +28,13 @@ def inicializar_sistema():
             id SERIAL PRIMARY KEY, usuario VARCHAR(50) UNIQUE, nombre_apellido VARCHAR(100),
             edad INTEGER, sexo VARCHAR(20), peso DECIMAL(5,2), nombre_medico VARCHAR(100), obra_social VARCHAR(100)
         );""")
+        # Añadimos columnas oxigeno y temperatura si no existen
         cur.execute("""CREATE TABLE IF NOT EXISTS registros (
             id SERIAL PRIMARY KEY, fecha DATE, hora TIME, tipo VARCHAR(50), 
             cant_izq DECIMAL(5,2), cant_der DECIMAL(5,2), presion_alta INTEGER, 
-            presion_baja INTEGER, pulso INTEGER, glucosa INTEGER, observaciones TEXT, usuario VARCHAR(50)
+            presion_baja INTEGER, pulso INTEGER, glucosa INTEGER, 
+            oxigeno INTEGER, temperatura DECIMAL(4,1),
+            observaciones TEXT, usuario VARCHAR(50)
         );""")
         conn.commit(); cur.close(); conn.close()
     except Exception as e: print(f"Error inicializando: {e}")
@@ -39,7 +42,6 @@ def inicializar_sistema():
 inicializar_sistema()
 
 @app.route("/", methods=["GET", "POST"])
-@app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         u = request.form.get("usuario", "").strip().lower()
@@ -66,7 +68,7 @@ def registro():
             conn = conectar(); cur = conn.cursor()
             cur.execute("INSERT INTO usuarios (usuario, password) VALUES (%s, %s)", (u, generate_password_hash(p)))
             conn.commit(); cur.close(); conn.close()
-            flash("Cuenta creada. Ya podés entrar.", "success")
+            flash("Cuenta creada.", "success")
             return redirect(url_for("login"))
         except: flash("El usuario ya existe", "danger")
     return render_template("register.html")
@@ -95,12 +97,13 @@ def cargar_registro():
     success = None
     if request.method == "POST":
         conn = conectar(); cur = conn.cursor()
-        cur.execute("""INSERT INTO registros (fecha, hora, tipo, cant_izq, cant_der, presion_alta, presion_baja, pulso, glucosa, observaciones, usuario) 
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", 
+        cur.execute("""INSERT INTO registros (fecha, hora, tipo, cant_izq, cant_der, presion_alta, presion_baja, pulso, glucosa, oxigeno, temperatura, observaciones, usuario) 
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", 
             (request.form.get("fecha"), request.form.get("hora"), request.form.get("tipo_registro"),
              request.form.get("cantidad_izq") or None, request.form.get("cantidad_der") or None,
              request.form.get("presion_alta") or None, request.form.get("presion_baja") or None,
              request.form.get("pulso") or None, request.form.get("glucosa") or None,
+             request.form.get("oxigeno") or None, request.form.get("temperatura") or None,
              request.form.get("observaciones"), session["usuario"]))
         conn.commit(); cur.close(); conn.close()
         success = "✅ Guardado"
@@ -131,12 +134,10 @@ def descargar_pdf():
     regs = cur.fetchall(); cur.close(); conn.close()
     buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=letter)
     
-    # Encabezado Ficha
     c.setFont("Helvetica-Bold", 14); c.drawString(50, 760, "REPORTE DE SALUD - FICHA MÉDICA")
     c.setFont("Helvetica", 10)
     if p:
-        c.drawString(50, 740, f"Paciente: {p['nombre_apellido']} | Edad: {p['edad']} | Sexo: {p['sexo']}")
-        c.drawString(50, 725, f"Obra Social: {p['obra_social']} | Médico: {p['nombre_medico']}")
+        c.drawString(50, 740, f"Paciente: {p['nombre_apellido']} | OS: {p['obra_social']}")
     c.line(50, 715, 550, 715)
     
     y = 690
@@ -145,21 +146,20 @@ def descargar_pdf():
         txt = f"[{r['fecha']}] {r['tipo'].upper()}: "
         if r['tipo'] == 'drenaje': txt += f"I:{r['cant_izq']}ml D:{r['cant_der']}ml"
         elif r['tipo'] == 'presion': txt += f"P:{r['presion_alta']}/{r['presion_baja']} Pulso:{r['pulso']}"
-        else: txt += f"G:{r['glucosa']}mg/dL"
+        elif r['tipo'] == 'glucosa': txt += f"G:{r['glucosa']}mg/dL"
+        elif r['tipo'] == 'oxigeno': txt += f"Sat O2:{r['oxigeno']}%"
+        elif r['tipo'] == 'temperatura': txt += f"Temp:{r['temperatura']}°C"
         c.drawString(50, y, txt)
         y -= 20
         
     c.save(); buf.seek(0)
     resp = make_response(buf.read())
     resp.headers['Content-Type'] = 'application/pdf'
-    # Forzar descarga
-    fecha_str = datetime.now().strftime("%d-%m-%Y")
-    resp.headers['Content-Disposition'] = f'attachment; filename=Reporte_Mauro_{fecha_str}.pdf'
+    resp.headers['Content-Disposition'] = f'attachment; filename=Reporte_Mauro.pdf'
     return resp
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
-    if "usuario" not in session: return redirect(url_for("login"))
     conn = conectar(); cur = conn.cursor()
     cur.execute("DELETE FROM registros WHERE id = %s AND usuario = %s", (id, session["usuario"]))
     conn.commit(); cur.close(); conn.close()
