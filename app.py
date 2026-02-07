@@ -10,13 +10,12 @@ import io
 # Librerías para el PDF
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave-segura-mauro-2026")
 
-# --- CONFIGURACIÓN DE SESIÓN (7 DÍAS) ---
 app.permanent_session_lifetime = timedelta(days=7)
-
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def conectar():
@@ -116,15 +115,23 @@ def descargar_pdf():
     if "usuario" not in session: return redirect(url_for("login"))
     try:
         dias = request.args.get('dias', default=7, type=int)
+        tipo_filtro = request.args.get('tipo', default='todos')
         fecha_limite = datetime.now() - timedelta(days=dias)
         
         conn = conectar()
         cur = conn.cursor(cursor_factory=DictCursor)
-        # ACÁ ESTÁ EL CAMBIO: agregamos ::date para convertir el texto a fecha
-        cur.execute("""SELECT * FROM registros 
-                       WHERE usuario = %s AND fecha::date >= %s 
-                       ORDER BY fecha DESC, hora DESC""", 
-                    (session["usuario"], fecha_limite.date()))
+        
+        # Filtro base por usuario y fecha (con casteo ::date)
+        query = "SELECT * FROM registros WHERE usuario = %s AND fecha::date >= %s"
+        params = [session["usuario"], fecha_limite.date()]
+        
+        # Si el usuario eligió un tipo específico
+        if tipo_filtro != 'todos':
+            query += " AND tipo = %s"
+            params.append(tipo_filtro)
+            
+        query += " ORDER BY fecha DESC, hora DESC"
+        cur.execute(query, params)
         registros = cur.fetchall()
         cur.close()
         conn.close()
@@ -132,17 +139,18 @@ def descargar_pdf():
         buf = io.BytesIO()
         c = canvas.Canvas(buf, pagesize=letter)
         
+        # Título del PDF
         c.setFont("Helvetica-Bold", 16)
-        c.drawString(50, 750, f"Reporte de Salud - Ultimos {dias} dias")
+        c.drawString(50, 750, f"Reporte: {tipo_filtro.upper()} - Ultimos {dias} dias")
         c.setFont("Helvetica", 10)
         c.drawString(50, 735, f"Usuario: {session['usuario']} | Generado: {datetime.now().strftime('%d/%m/%Y')}")
         c.line(50, 730, 550, 730)
 
         y = 700
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(50, y, "Fecha")
-        c.drawString(130, y, "Tipo")
-        c.drawString(210, y, "Valores / Notas")
+        c.drawString(50, y, "Fecha/Hora")
+        c.drawString(150, y, "Tipo")
+        c.drawString(250, y, "Valores / Notas")
         y -= 20
         
         c.setFont("Helvetica", 9)
@@ -151,24 +159,25 @@ def descargar_pdf():
                 c.showPage()
                 y = 750
             
-            c.drawString(50, y, f"{r['fecha']}")
+            c.drawString(50, y, f"{r['fecha']} {r['hora']}")
             
-            tipo = "Glucosa"
-            valores = f"{r['glucosa']} mg/dL"
-            if r['cant_izq'] or r['cant_der']:
-                tipo = "Drenaje"
-                valores = f"I: {r['cant_izq'] or 0} | D: {r['cant_der'] or 0}"
-            elif r['presion_alta']:
-                tipo = "Presion"
-                valores = f"{r['presion_alta']}/{r['presion_baja']} (P:{r['pulso']})"
-                
-            c.drawString(130, y, tipo)
-            c.drawString(210, y, valores)
+            info = ""
+            if r['tipo'] == 'drenaje':
+                info = f"I: {r['cant_izq'] or 0}ml | D: {r['cant_der'] or 0}ml"
+            elif r['tipo'] == 'presion':
+                info = f"{r['presion_alta']}/{r['presion_baja']} (P:{r['pulso']})"
+            else:
+                info = f"{r['glucosa']} mg/dL"
+
+            c.drawString(150, y, r['tipo'].capitalize())
+            c.drawString(250, y, info)
             
             if r['observaciones']:
                 y -= 12
                 c.setFont("Helvetica-Oblique", 8)
-                c.drawString(210, y, f"Nota: {str(r['observaciones'])[:70]}")
+                c.setFillColor(colors.gray)
+                c.drawString(250, y, f"Nota: {str(r['observaciones'])[:75]}")
+                c.setFillColor(colors.black)
                 c.setFont("Helvetica", 9)
             
             y -= 20
@@ -178,11 +187,11 @@ def descargar_pdf():
         
         response = make_response(buf.read())
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=reporte_{dias}_dias.pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=reporte_{tipo_filtro}_{dias}dias.pdf'
         return response
 
     except Exception as e:
-        return f"Error tecnico al generar PDF: {str(e)}", 500
+        return f"Error tecnico: {str(e)}", 500
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
