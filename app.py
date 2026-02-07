@@ -23,7 +23,6 @@ def conectar():
 def inicializar_sistema():
     try:
         conn = conectar(); cur = conn.cursor()
-        # Crear tablas básicas
         cur.execute("CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, usuario VARCHAR(50) UNIQUE, password TEXT);")
         cur.execute("""CREATE TABLE IF NOT EXISTS perfil (
             id SERIAL PRIMARY KEY, usuario VARCHAR(50) UNIQUE, nombre_apellido VARCHAR(100),
@@ -32,19 +31,14 @@ def inicializar_sistema():
         cur.execute("""CREATE TABLE IF NOT EXISTS registros (
             id SERIAL PRIMARY KEY, fecha DATE, hora TIME, tipo VARCHAR(50), 
             cant_izq DECIMAL(5,2), cant_der DECIMAL(5,2), presion_alta INTEGER, 
-            presion_baja INTEGER, pulso INTEGER, glucosa INTEGER, observaciones TEXT, usuario VARCHAR(50)
+            presion_baja INTEGER, pulso INTEGER, glucosa INTEGER, 
+            oxigeno INTEGER, temperatura DECIMAL(4,1), observaciones TEXT, usuario VARCHAR(50)
         );""")
-        
-        # --- ESTO ARREGLA EL ERROR: Agrega las columnas nuevas si no existen ---
         cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS oxigeno INTEGER;")
         cur.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS temperatura DECIMAL(4,1);")
-        
         conn.commit(); cur.close(); conn.close()
-        print("Base de datos actualizada con éxito.")
-    except Exception as e: 
-        print(f"Error inicializando: {e}")
+    except Exception as e: print(f"Error inicializando: {e}")
 
-# Se ejecuta al arrancar la app
 inicializar_sistema()
 
 @app.route("/", methods=["GET", "POST"])
@@ -60,7 +54,7 @@ def login():
             if user and check_password_hash(user["password"], p):
                 session.permanent = True
                 session["usuario"] = u
-                return redirect(url_for("cargar_registro"))
+                return redirect(url_for("ver_registros"))
             flash("Usuario o clave incorrectos", "danger")
         except Exception as e: return f"Error: {e}", 500
     return render_template("login.html")
@@ -78,24 +72,6 @@ def registro():
             return redirect(url_for("login"))
         except: flash("El usuario ya existe", "danger")
     return render_template("register.html")
-
-@app.route("/perfil", methods=["GET", "POST"])
-def editar_perfil():
-    if "usuario" not in session: return redirect(url_for("login"))
-    conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
-    if request.method == "POST":
-        cur.execute("""INSERT INTO perfil (usuario, nombre_apellido, edad, sexo, peso, nombre_medico, obra_social)
-            VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (usuario) DO UPDATE SET 
-            nombre_apellido=EXCLUDED.nombre_apellido, edad=EXCLUDED.edad, sexo=EXCLUDED.sexo, 
-            peso=EXCLUDED.peso, nombre_medico=EXCLUDED.nombre_medico, obra_social=EXCLUDED.obra_social""",
-            (session["usuario"], request.form.get("nombre"), request.form.get("edad"), 
-             request.form.get("sexo"), request.form.get("peso"), request.form.get("medico"), request.form.get("obra_social")))
-        conn.commit()
-        flash("Ficha guardada", "success")
-    cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
-    perfil = cur.fetchone()
-    cur.close(); conn.close()
-    return render_template("index.html", modo="perfil", perfil=perfil, usuario=session["usuario"])
 
 @app.route("/cargar", methods=["GET", "POST"])
 def cargar_registro():
@@ -119,54 +95,90 @@ def cargar_registro():
 def ver_registros():
     if "usuario" not in session: return redirect(url_for("login"))
     conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
-    cur.execute("SELECT * FROM registros WHERE usuario = %s ORDER BY fecha DESC, hora DESC", (session["usuario"],))
+    
+    # Obtener registros para la tabla
+    cur.execute("SELECT * FROM registros WHERE usuario = %s ORDER BY fecha DESC, hora DESC LIMIT 50", (session["usuario"],))
     regs = cur.fetchall()
+    
+    # CÁLCULO DE ESTADÍSTICAS (Últimos 30 días)
+    hace_30 = datetime.now() - timedelta(days=30)
+    cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s", (session["usuario"], hace_30.date()))
+    r_stats = cur.fetchall()
+    
+    stats = {
+        'glucosa': {'prom':0, 'max':0, 'min':999, 'alertas':0, 'count':0},
+        'presion': {'prom_a':0, 'prom_b':0, 'alertas':0, 'count':0},
+        'pulso': {'prom':0},
+        'oxigeno': {'prom':0, 'min':100}
+    }
+    
+    for r in r_stats:
+        if r['tipo'] == 'glucosa' and r['glucosa']:
+            v = r['glucosa']
+            stats['glucosa']['count'] += 1
+            stats['glucosa']['prom'] += v
+            if v > stats['glucosa']['max']: stats['glucosa']['max'] = v
+            if v < stats['glucosa']['min']: stats['glucosa']['min'] = v
+            if v > 140 or v < 70: stats['glucosa']['alertas'] += 1
+            
+        elif r['tipo'] == 'presion':
+            if r['presion_alta'] and r['presion_baja']:
+                stats['presion']['count'] += 1
+                stats['presion']['prom_a'] += r['presion_alta']
+                stats['presion']['prom_b'] += r['presion_baja']
+                if r['presion_alta'] >= 140 or r['presion_baja'] >= 90: stats['presion']['alertas'] += 1
+            if r['pulso']:
+                stats['pulso']['prom'] += r['pulso']
+
+    # Finalizar promedios
+    if stats['glucosa']['count'] > 0: stats['glucosa']['prom'] //= stats['glucosa']['count']
+    else: stats['glucosa']['min'] = 0
+    
+    if stats['presion']['count'] > 0:
+        stats['presion']['prom_a'] //= stats['presion']['count']
+        stats['presion']['prom_b'] //= stats['presion']['count']
+        stats['pulso']['prom'] //= stats['presion']['count']
+
     cur.close(); conn.close()
-    return render_template("index.html", registros=regs, modo="ver", usuario=session["usuario"])
+    return render_template("index.html", registros=regs, stats=stats, modo="ver", usuario=session["usuario"])
+
+@app.route("/perfil", methods=["GET", "POST"])
+def editar_perfil():
+    if "usuario" not in session: return redirect(url_for("login"))
+    conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
+    if request.method == "POST":
+        cur.execute("""INSERT INTO perfil (usuario, nombre_apellido, edad, sexo, peso, nombre_medico, obra_social)
+            VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (usuario) DO UPDATE SET 
+            nombre_apellido=EXCLUDED.nombre_apellido, edad=EXCLUDED.edad, sexo=EXCLUDED.sexo, 
+            peso=EXCLUDED.peso, nombre_medico=EXCLUDED.nombre_medico, obra_social=EXCLUDED.obra_social""",
+            (session["usuario"], request.form.get("nombre"), request.form.get("edad"), 
+             request.form.get("sexo"), request.form.get("peso"), request.form.get("medico"), request.form.get("obra_social")))
+        conn.commit()
+        flash("Perfil actualizado", "success")
+    cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
+    perfil = cur.fetchone()
+    cur.close(); conn.close()
+    return render_template("index.html", modo="perfil", perfil=perfil, usuario=session["usuario"])
 
 @app.route("/reporte-pdf")
 def descargar_pdf():
     if "usuario" not in session: return redirect(url_for("login"))
     dias = request.args.get('dias', default=7, type=int)
-    tipo_f = request.args.get('tipo', default='todos')
     limite = datetime.now() - timedelta(days=dias)
     conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
-    cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
-    p = cur.fetchone()
-    query = "SELECT * FROM registros WHERE usuario = %s AND fecha::date >= %s"
-    params = [session["usuario"], limite.date()]
-    if tipo_f != 'todos': query += " AND tipo = %s"; params.append(tipo_f)
-    cur.execute(query + " ORDER BY fecha DESC", params)
+    cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s ORDER BY fecha DESC", (session["usuario"], limite.date()))
     regs = cur.fetchall(); cur.close(); conn.close()
     buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=letter)
-    
-    c.setFont("Helvetica-Bold", 14); c.drawString(50, 760, "REPORTE DE SALUD - MAURO")
-    c.setFont("Helvetica", 10)
-    if p:
-        c.drawString(50, 740, f"Paciente: {p['nombre_apellido']} | OS: {p['obra_social']}")
-    c.line(50, 715, 550, 715)
-    
-    y = 690
+    c.drawString(100, 750, f"Reporte de Salud - Mauro (Ultimos {dias} dias)")
+    y = 720
     for r in regs:
-        if y < 50: c.showPage(); y = 750
-        txt = f"[{r['fecha']}] {r['tipo'].upper()}: "
-        if r['tipo'] == 'drenaje': txt += f"I:{r['cant_izq']}ml D:{r['cant_der']}ml"
-        elif r['tipo'] == 'presion': txt += f"P:{r['presion_alta']}/{r['presion_baja']} Pulso:{r['pulso']}"
-        elif r['tipo'] == 'glucosa': txt += f"G:{r['glucosa']}mg/dL"
-        elif r['tipo'] == 'oxigeno': txt += f"O2:{r['oxigeno']}%"
-        elif r['tipo'] == 'temperatura': txt += f"Temp:{r['temperatura']}C"
-        c.drawString(50, y, txt)
+        c.drawString(100, y, f"{r['fecha']} - {r['tipo'].upper()}: {r['observaciones'] or ''}")
         y -= 20
-        
     c.save(); buf.seek(0)
-    resp = make_response(buf.read())
-    resp.headers['Content-Type'] = 'application/pdf'
-    resp.headers['Content-Disposition'] = f'attachment; filename=Reporte_Salud.pdf'
-    return resp
+    return make_response(buf.read(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=reporte.pdf'})
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
-    if "usuario" not in session: return redirect(url_for("login"))
     conn = conectar(); cur = conn.cursor()
     cur.execute("DELETE FROM registros WHERE id = %s AND usuario = %s", (id, session["usuario"]))
     conn.commit(); cur.close(); conn.close()
