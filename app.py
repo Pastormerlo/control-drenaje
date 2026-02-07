@@ -95,87 +95,52 @@ def cargar_registro():
 def ver_registros():
     if "usuario" not in session: return redirect(url_for("login"))
     conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
-    
-    # Obtener registros para la tabla
     cur.execute("SELECT * FROM registros WHERE usuario = %s ORDER BY fecha DESC, hora DESC LIMIT 50", (session["usuario"],))
     regs = cur.fetchall()
-    
-    # CÁLCULO DE ESTADÍSTICAS (Últimos 30 días)
     hace_30 = datetime.now() - timedelta(days=30)
     cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s", (session["usuario"], hace_30.date()))
     r_stats = cur.fetchall()
-    
     stats = {
         'glucosa': {'prom':0, 'max':0, 'min':999, 'alertas':0, 'count':0},
         'presion': {'prom_a':0, 'prom_b':0, 'alertas':0, 'count':0},
-        'pulso': {'prom':0},
-        'oxigeno': {'prom':0, 'min':100}
+        'pulso': {'prom':0}
     }
-    
     for r in r_stats:
         if r['tipo'] == 'glucosa' and r['glucosa']:
-            v = r['glucosa']
-            stats['glucosa']['count'] += 1
-            stats['glucosa']['prom'] += v
+            v = r['glucosa']; stats['glucosa']['count'] += 1; stats['glucosa']['prom'] += v
             if v > stats['glucosa']['max']: stats['glucosa']['max'] = v
             if v < stats['glucosa']['min']: stats['glucosa']['min'] = v
             if v > 140 or v < 70: stats['glucosa']['alertas'] += 1
-            
         elif r['tipo'] == 'presion':
             if r['presion_alta'] and r['presion_baja']:
-                stats['presion']['count'] += 1
-                stats['presion']['prom_a'] += r['presion_alta']
-                stats['presion']['prom_b'] += r['presion_baja']
+                stats['presion']['count'] += 1; stats['presion']['prom_a'] += r['presion_alta']; stats['presion']['prom_b'] += r['presion_baja']
                 if r['presion_alta'] >= 140 or r['presion_baja'] >= 90: stats['presion']['alertas'] += 1
-            if r['pulso']:
-                stats['pulso']['prom'] += r['pulso']
-
-    # Finalizar promedios
+            if r['pulso']: stats['pulso']['prom'] += r['pulso']
     if stats['glucosa']['count'] > 0: stats['glucosa']['prom'] //= stats['glucosa']['count']
     else: stats['glucosa']['min'] = 0
-    
     if stats['presion']['count'] > 0:
-        stats['presion']['prom_a'] //= stats['presion']['count']
-        stats['presion']['prom_b'] //= stats['presion']['count']
+        stats['presion']['prom_a'] //= stats['presion']['count']; stats['presion']['prom_b'] //= stats['presion']['count']
         stats['pulso']['prom'] //= stats['presion']['count']
-
     cur.close(); conn.close()
     return render_template("index.html", registros=regs, stats=stats, modo="ver", usuario=session["usuario"])
 
-@app.route("/perfil", methods=["GET", "POST"])
+@app.route("/mi-ficha", methods=["GET", "POST"])
 def editar_perfil():
     if "usuario" not in session: return redirect(url_for("login"))
     conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
     if request.method == "POST":
-        cur.execute("""INSERT INTO perfil (usuario, nombre_apellido, edad, sexo, peso, nombre_medico, obra_social)
+        cur.execute("""INSERT INTO perfil (usuario, nombre_apellido, edad, sexo, peso, nombre_medico, opera_social)
             VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (usuario) DO UPDATE SET 
             nombre_apellido=EXCLUDED.nombre_apellido, edad=EXCLUDED.edad, sexo=EXCLUDED.sexo, 
             peso=EXCLUDED.peso, nombre_medico=EXCLUDED.nombre_medico, obra_social=EXCLUDED.obra_social""",
             (session["usuario"], request.form.get("nombre"), request.form.get("edad"), 
              request.form.get("sexo"), request.form.get("peso"), request.form.get("medico"), request.form.get("obra_social")))
         conn.commit()
-        flash("Perfil actualizado", "success")
+        flash("Ficha actualizada", "success")
     cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
     perfil = cur.fetchone()
     cur.close(); conn.close()
     return render_template("index.html", modo="perfil", perfil=perfil, usuario=session["usuario"])
-
-@app.route("/reporte-pdf")
-def descargar_pdf():
-    if "usuario" not in session: return redirect(url_for("login"))
-    dias = request.args.get('dias', default=7, type=int)
-    limite = datetime.now() - timedelta(days=dias)
-    conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
-    cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s ORDER BY fecha DESC", (session["usuario"], limite.date()))
-    regs = cur.fetchall(); cur.close(); conn.close()
-    buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=letter)
-    c.drawString(100, 750, f"Reporte de Salud - Mauro (Ultimos {dias} dias)")
-    y = 720
-    for r in regs:
-        c.drawString(100, y, f"{r['fecha']} - {r['tipo'].upper()}: {r['observaciones'] or ''}")
-        y -= 20
-    c.save(); buf.seek(0)
-    return make_response(buf.read(), 200, {'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=reporte.pdf'})
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
