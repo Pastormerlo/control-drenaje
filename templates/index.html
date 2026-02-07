@@ -8,8 +8,8 @@
     <style>
         body { background-color: #f0f2f5; font-family: -apple-system, sans-serif; }
         .card { border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .stat-val { font-size: 1.6rem; font-weight: bold; }
-        .stat-label { font-size: 0.7rem; text-transform: uppercase; color: #6c757d; font-weight: 700; letter-spacing: 0.5px; }
+        .stat-val { font-size: 1.5rem; font-weight: bold; }
+        .stat-label { font-size: 0.65rem; text-transform: uppercase; color: #6c757d; font-weight: 700; letter-spacing: 0.5px; }
         .badge-alert { background-color: #ffe5e5; color: #d90429; font-weight: bold; font-size: 0.65rem; }
         .seccion-oculta { display: none; }
         .nav-link-custom { color: white; text-decoration: none; font-size: 0.9rem; font-weight: 500; }
@@ -17,7 +17,7 @@
 </head>
 <body>
 
-<nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
+<nav class="navbar navbar-dark bg-primary mb-3 shadow-sm">
     <div class="container">
         <span class="navbar-brand fw-bold">Mauro Salud</span>
         <div>
@@ -28,23 +28,24 @@
 </nav>
 
 <div class="container pb-5">
-    <div class="btn-group w-100 mb-4 shadow-sm bg-white rounded">
+    <div class="btn-group w-100 mb-3 shadow-sm bg-white rounded">
         <a href="{{ url_for('cargar_registro') }}" class="btn btn-white py-2 {% if modo=='cargar' %}active btn-primary text-white{% endif %}">➕ Cargar</a>
         <a href="{{ url_for('ver_registros') }}" class="btn btn-white py-2 {% if modo=='ver' %}active btn-primary text-white{% endif %}">📊 Indicadores</a>
     </div>
 
     {% if modo == 'perfil' %}
     <div class="card p-4">
-        <h5 class="mb-4 fw-bold text-primary">Mi Ficha Individual</h5>
+        <h5 class="mb-3 fw-bold text-primary">Mi Ficha Médica</h5>
         {% with msgs = get_flashed_messages() %}{% if msgs %}<div class="alert alert-success small">{{msgs[0]}}</div>{% endif %}{% endwith %}
         <form action="{{ url_for('editar_perfil') }}" method="POST">
             <div class="row g-3">
-                <div class="col-12"><label class="small fw-bold">Nombre y Apellido</label><input type="text" name="nombre" class="form-control" value="{{perfil.nombre_apellido or ''}}" required></div>
+                <div class="col-12"><label class="small fw-bold">Nombre Completo</label><input type="text" name="nombre" class="form-control" value="{{perfil.nombre_apellido or ''}}" required></div>
                 <div class="col-6"><label class="small fw-bold">Edad</label><input type="number" name="edad" class="form-control" value="{{perfil.edad or ''}}"></div>
                 <div class="col-6"><label class="small fw-bold">Sexo</label><select name="sexo" class="form-select"><option value="M" {% if perfil.sexo=='M' %}selected{% endif %}>M</option><option value="F" {% if perfil.sexo=='F' %}selected{% endif %}>F</option></select></div>
+                <div class="col-12"><label class="small fw-bold text-danger">Peso Actual (kg)</label><input type="number" step="0.1" name="weight" class="form-control border-danger" name="peso" value="{{perfil.peso or ''}}" placeholder="0.0"></div>
                 <div class="col-12"><label class="small fw-bold">Obra Social</label><input type="text" name="obra_social" class="form-control" value="{{perfil.obra_social or ''}}"></div>
-                <div class="col-12"><label class="small fw-bold">Médico</label><input type="text" name="medico" class="form-control" value="{{perfil.nombre_medico or ''}}"></div>
-                <button type="submit" class="btn btn-success w-100 p-3 fw-bold">ACTUALIZAR DATOS</button>
+                <div class="col-12"><label class="small fw-bold">Médico de Cabecera</label><input type="text" name="medico" class="form-control" value="{{perfil.nombre_medico or ''}}"></div>
+                <button type="submit" class="btn btn-success w-100 p-3 fw-bold mt-2">ACTUALIZAR FICHA</button>
             </div>
         </form>
     </div>
@@ -52,17 +53,17 @@
 
     {% if modo == 'cargar' %}
     <div class="card p-4">
-        <h5 class="mb-4 fw-bold text-primary">Nuevo Registro</h5>
+        <h5 class="mb-3 fw-bold text-primary">Nuevo Registro</h5>
         {% if success %}<div class="alert alert-success small">{{ success }}</div>{% endif %}
         <form action="{{ url_for('cargar_registro') }}" method="POST">
             <div class="row g-3">
                 <div class="col-6"><label class="small fw-bold">Fecha</label><input type="date" name="fecha" class="form-control" id="f_input" required></div>
                 <div class="col-6"><label class="small fw-bold">Hora</label><input type="time" name="hora" class="form-control" id="h_input" required></div>
                 <div class="col-12">
-                    <select class="form-select form-select-lg fw-bold text-primary" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
+                    <select class="form-select form-select-lg fw-bold" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
                         <option value="presion">❤️ Presión y Pulso</option>
                         <option value="glucosa">🩸 Glucosa</option>
-                        <option value="oxigeno">🌬️ Saturación O₂</option>
+                        <option value="oxigeno">🌬️ Oxígeno</option>
                         <option value="temperatura">🌡️ Temperatura</option>
                         <option value="drenaje">💧 Drenaje</option>
                     </select>
@@ -76,11 +77,11 @@
                 <div id="campos_oxigeno" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" name="oxigeno" class="form-control" placeholder="Sat %"></div></div>
                 <div id="campos_temperatura" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" step="0.1" name="temperatura" class="form-control" placeholder="°C"></div></div>
                 <div id="campos_drenaje" class="row g-2 mt-1 seccion-oculta">
-                    <div class="col-6"><input type="number" step="0.1" name="cantidad_izq" class="form-control" placeholder="Izq (ml)"></div>
-                    <div class="col-6"><input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="Der (ml)"></div>
+                    <div class="col-6"><input type="number" step="0.1" name="cantidad_izq" class="form-control" placeholder="I (ml)"></div>
+                    <div class="col-6"><input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="D (ml)"></div>
                 </div>
                 <div class="col-12"><textarea name="observaciones" class="form-control" rows="2" placeholder="Notas..."></textarea></div>
-                <button type="submit" class="btn btn-primary w-100 p-3 fw-bold mt-2">GUARDAR DATOS</button>
+                <button type="submit" class="btn btn-primary w-100 p-3 fw-bold mt-2">GUARDAR</button>
             </div>
         </form>
     </div>
@@ -96,22 +97,22 @@
     {% endif %}
 
     {% if modo == 'ver' %}
-    <h6 class="stat-label mb-3 text-center">Resumen Médico (30 días)</h6>
-    <div class="row g-3 mb-4">
+    <div class="text-center mb-3">
+        <span class="badge bg-secondary px-3 py-2">⚖️ Peso Actual: {{stats.peso_actual}} kg</span>
+    </div>
+    <div class="row g-2 mb-4">
         <div class="col-6">
             <div class="card p-3 border-start border-danger border-4 h-100">
                 <div class="stat-label">❤️ Presión</div>
                 <div class="stat-val text-danger">{{stats.presion.prom_a}}/{{stats.presion.prom_b}}</div>
-                <div class="small text-muted" style="font-size: 0.6rem;">MÁX: {{stats.presion.max_a}} | MÍN: {{stats.presion.min_a}}</div>
-                {% if stats.presion.alertas > 0 %}<span class="badge badge-alert mt-2">{{stats.presion.alertas}} altas</span>{% endif %}
+                <div class="small text-muted" style="font-size: 0.6rem;">MÁX: {{stats.presion.max_a}}</div>
             </div>
         </div>
         <div class="col-6">
             <div class="card p-3 border-start border-success border-4 h-100">
                 <div class="stat-label">🩸 Glucosa</div>
                 <div class="stat-val text-success">{{stats.glucosa.prom}}</div>
-                <div class="small text-muted" style="font-size: 0.6rem;">MÁX: {{stats.glucosa.max}} | MÍN: {{stats.glucosa.min}}</div>
-                {% if stats.glucosa.alertas > 0 %}<span class="badge badge-alert mt-2">{{stats.glucosa.alertas}} alertas</span>{% endif %}
+                <div class="small text-muted" style="font-size: 0.6rem;">MÁX: {{stats.glucosa.max}}</div>
             </div>
         </div>
         <div class="col-6">
@@ -119,7 +120,6 @@
                 <div class="stat-label">🌬️ Oxígeno</div>
                 <div class="stat-val text-info">{{stats.oxigeno.prom}}%</div>
                 <div class="small text-muted" style="font-size: 0.6rem;">MÍN: {{stats.oxigeno.min}}%</div>
-                {% if stats.oxigeno.alertas > 0 %}<span class="badge badge-alert mt-2">{{stats.oxigeno.alertas}} bajas</span>{% endif %}
             </div>
         </div>
         <div class="col-6">
@@ -127,7 +127,6 @@
                 <div class="stat-label">🌡️ Temp.</div>
                 <div class="stat-val text-warning">{{stats.temp.prom}}°</div>
                 <div class="small text-muted" style="font-size: 0.6rem;">MÁX: {{stats.temp.max}}°</div>
-                {% if stats.temp.alertas > 0 %}<span class="badge badge-alert mt-2">{{stats.temp.alertas}} picos</span>{% endif %}
             </div>
         </div>
     </div>
