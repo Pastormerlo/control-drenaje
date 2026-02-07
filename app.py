@@ -10,7 +10,6 @@ import io
 # Librerías para el PDF
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.utils import ImageReader
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave-segura-mauro-2026")
@@ -115,71 +114,75 @@ def ver_registros():
 @app.route("/reporte-pdf")
 def descargar_pdf():
     if "usuario" not in session: return redirect(url_for("login"))
-    dias = request.args.get('dias', default=7, type=int)
-    fecha_limite = datetime.now() - timedelta(days=dias)
-    conn = conectar()
-    cur = conn.cursor(cursor_factory=DictCursor)
-    cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s ORDER BY fecha DESC, hora DESC", 
-                (session["usuario"], fecha_limite.date()))
-    registros = cur.fetchall()
-    conn.close()
-
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=letter)
-    
-    # Intentar poner el logo si existe
     try:
-        logo_path = os.path.join(app.root_path, 'static', 'icon-192.png')
-        logo = ImageReader(logo_path)
-        c.drawImage(logo, 50, 740, width=40, height=40, mask='auto')
-    except:
-        pass
-
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(100, 760, f"Reporte de Salud - Últimos {dias} días")
-    c.setFont("Helvetica", 10)
-    c.drawString(100, 745, f"Usuario: {session['usuario']} | Generado: {datetime.now().strftime('%d/%m/%Y')}")
-    c.line(50, 730, 550, 730)
-
-    y = 710
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(50, y, "Fecha/Hora")
-    c.drawString(180, y, "Tipo")
-    c.drawString(300, y, "Valores / Observaciones")
-    y -= 20
-    
-    c.setFont("Helvetica", 9)
-    for r in registros:
-        if y < 50:
-            c.showPage()
-            y = 750
+        dias = request.args.get('dias', default=7, type=int)
+        fecha_limite = datetime.now() - timedelta(days=dias)
         
-        c.drawString(50, y, f"{r['fecha']} {r['hora']}")
+        conn = conectar()
+        cur = conn.cursor(cursor_factory=DictCursor)
+        cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s ORDER BY fecha DESC, hora DESC", 
+                    (session["usuario"], fecha_limite.date()))
+        registros = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf, pagesize=letter)
         
-        tipo = "Glucosa"
-        valores = f"{r['glucosa']} mg/dL"
-        if r['cant_izq'] or r['cant_der']:
-            tipo = "Drenaje"
-            valores = f"I: {r['cant_izq'] or 0} | D: {r['cant_der'] or 0}"
-        elif r['presion_alta']:
-            tipo = "Presión"
-            valores = f"{r['presion_alta']}/{r['presion_baja']} (P: {r['pulso']})"
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, 750, f"Reporte de Salud - Ultimos {dias} dias")
+        c.setFont("Helvetica", 10)
+        c.drawString(50, 735, f"Usuario: {session['usuario']} | Generado: {datetime.now().strftime('%d/%m/%Y')}")
+        c.line(50, 730, 550, 730)
+
+        y = 700
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(50, y, "Fecha")
+        c.drawString(130, y, "Tipo")
+        c.drawString(210, y, "Valores / Notas")
+        y -= 20
+        
+        c.setFont("Helvetica", 9)
+        for r in registros:
+            if y < 60:
+                c.showPage()
+                y = 750
             
-        c.drawString(180, y, tipo)
-        c.drawString(300, y, valores)
-        y -= 15
-        if r['observaciones']:
-            c.setFont("Helvetica-Oblique", 8)
-            c.drawString(300, y, f"Obs: {r['observaciones'][:60]}")
-            c.setFont("Helvetica", 9)
-            y -= 12
+            # Fecha y Hora
+            c.drawString(50, y, f"{r['fecha']}")
+            
+            # Tipo y Valores
+            tipo = "Glucosa"
+            valores = f"{r['glucosa']} mg/dL"
+            if r['cant_izq'] or r['cant_der']:
+                tipo = "Drenaje"
+                valores = f"I: {r['cant_izq'] or 0} | D: {r['cant_der'] or 0}"
+            elif r['presion_alta']:
+                tipo = "Presion"
+                valores = f"{r['presion_alta']}/{r['presion_baja']} (P:{r['pulso']})"
+                
+            c.drawString(130, y, tipo)
+            c.drawString(210, y, valores)
+            
+            # Observaciones (si existen)
+            if r['observaciones']:
+                y -= 12
+                c.setFont("Helvetica-Oblique", 8)
+                c.drawString(210, y, f"Nota: {str(r['observaciones'])[:70]}")
+                c.setFont("Helvetica", 9)
+            
+            y -= 20
 
-    c.save()
-    buf.seek(0)
-    response = make_response(buf.read())
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=reporte_{dias}_dias.pdf'
-    return response
+        c.save()
+        buf.seek(0)
+        
+        response = make_response(buf.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=reporte_{dias}_dias.pdf'
+        return response
+
+    except Exception as e:
+        return f"Error tecnico al generar PDF: {str(e)}", 500
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
