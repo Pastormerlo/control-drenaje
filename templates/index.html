@@ -11,7 +11,7 @@
         body { background-color: #f4f7f6; font-family: sans-serif; }
         .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border:none; }
         .seccion-oculta { display: none; }
-        canvas { max-height: 280px; width: 100% !important; }
+        canvas { max-height: 250px; width: 100% !important; }
         .nav-link { font-weight: bold; }
     </style>
 </head>
@@ -66,8 +66,10 @@
                 <div class="col-12">
                     <select class="form-select form-select-lg" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
                         <option value="drenaje">💧 Drenaje</option>
-                        <option value="presion">❤️ Presión</option>
+                        <option value="presion">❤️ Presión / Pulso</option>
                         <option value="glucosa">🩸 Glucosa</option>
+                        <option value="oxigeno">🌬️ Saturación O₂</option>
+                        <option value="temperatura">🌡️ Temperatura</option>
                     </select>
                 </div>
                 <div id="campos_drenaje" class="row g-2 mt-1">
@@ -75,170 +77,108 @@
                     <div class="col-6"><input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="Der (ml)"></div>
                 </div>
                 <div id="campos_presion" class="row g-2 mt-1 seccion-oculta">
-                    <div class="col-4"><label class="small">Alta</label><input type="number" name="presion_alta" class="form-control" placeholder="120"></div>
-                    <div class="col-4"><label class="small">Baja</label><input type="number" name="presion_baja" class="form-control" placeholder="80"></div>
-                    <div class="col-4"><label class="small">Pulso</label><input type="number" name="pulso" class="form-control" placeholder="70"></div>
+                    <div class="col-4"><input type="number" name="presion_alta" class="form-control" placeholder="Alta"></div>
+                    <div class="col-4"><input type="number" name="presion_baja" class="form-control" placeholder="Baja"></div>
+                    <div class="col-4"><input type="number" name="pulso" class="form-control" placeholder="Pulso"></div>
                 </div>
                 <div id="campos_glucosa" class="row g-2 mt-1 seccion-oculta">
-                    <div class="col-12"><input type="number" name="glucosa" class="form-control" placeholder="Glucosa (mg/dL)"></div>
+                    <div class="col-12"><input type="number" name="glucosa" class="form-control" placeholder="mg/dL"></div>
+                </div>
+                <div id="campos_oxigeno" class="row g-2 mt-1 seccion-oculta">
+                    <div class="col-12"><input type="number" name="oxigeno" class="form-control" placeholder="Saturación %"></div>
+                </div>
+                <div id="campos_temperatura" class="row g-2 mt-1 seccion-oculta">
+                    <div class="col-12"><input type="number" step="0.1" name="temperatura" class="form-control" placeholder="Temperatura °C"></div>
                 </div>
                 <div class="col-12"><label>Observaciones</label><textarea name="observaciones" class="form-control" rows="2"></textarea></div>
-                <button type="submit" class="btn btn-success w-100 p-3 fw-bold mt-3">GUARDAR REGISTRO</button>
+                <button type="submit" class="btn btn-success w-100 p-3 fw-bold mt-3">GUARDAR</button>
             </div>
         </form>
     </div>
     <script>
         document.getElementById('f_input').valueAsDate = new Date();
         document.getElementById('h_input').value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
+        function mostrarCampos() {
+            const t = document.getElementById('tipo_registro').value;
+            document.getElementById('campos_drenaje').classList.toggle('seccion-oculta', t !== 'drenaje');
+            document.getElementById('campos_presion').classList.toggle('seccion-oculta', t !== 'presion');
+            document.getElementById('campos_glucosa').classList.toggle('seccion-oculta', t !== 'glucosa');
+            document.getElementById('campos_oxigeno').classList.toggle('seccion-oculta', t !== 'oxigeno');
+            document.getElementById('campos_temperatura').classList.toggle('seccion-oculta', t !== 'temperatura');
+        }
     </script>
     {% endif %}
 
     {% if modo == 'ver' %}
-    <div class="card p-3 text-center border-primary shadow-sm mb-4">
-        <h6 class="mb-3 text-primary">📄 Reporte PDF (Descarga Directa)</h6>
-        <div class="row g-2">
-            <div class="col-4"><button onclick="abrirOpciones(7)" class="btn btn-primary w-100 btn-sm">7 días</button></div>
-            <div class="col-4"><button onclick="abrirOpciones(15)" class="btn btn-primary w-100 btn-sm">15 días</button></div>
-            <div class="col-4"><button onclick="abrirOpciones(30)" class="btn btn-primary w-100 btn-sm">30 días</button></div>
-        </div>
-    </div>
-
-    <div class="card p-2 mb-3">
-        <h6 class="text-center text-muted small">Control de Drenaje (ml)</h6>
-        <canvas id="chartDrenaje"></canvas>
-    </div>
+    <div class="card p-2 mb-3"><h6 class="text-center small">Drenaje</h6><canvas id="chartDrenaje"></canvas></div>
+    <div class="card p-2 mb-3"><h6 class="text-center small">Presión y Pulso</h6><canvas id="chartPresion"></canvas></div>
+    <div class="card p-2 mb-3"><h6 class="text-center small">Oxigeno y Temperatura</h6><canvas id="chartOxigeno"></canvas></div>
     
-    <div class="card p-2 mb-3">
-        <h6 class="text-center text-muted small">Presión Arterial vs Pulso</h6>
-        <canvas id="chartPresion"></canvas>
-    </div>
-
-    <div class="card p-2 mb-3">
-        <h6 class="text-center text-muted small">Niveles de Glucosa</h6>
-        <canvas id="chartGlucosa"></canvas>
-    </div>
-
     <div class="table-responsive">
         <table class="table table-sm table-hover bg-white rounded">
-            <thead class="table-dark"><tr><th>Fecha</th><th>Dato</th><th></th></tr></thead>
+            <thead class="table-dark"><tr><th>Fecha</th><th>Tipo</th><th>Dato</th><th></th></tr></thead>
             <tbody>
                 {% for r in registros %}
                 <tr>
                     <td><small>{{r.fecha}}</small></td>
+                    <td><small>{{r.tipo}}</small></td>
                     <td>
-                        {% if r.tipo == 'drenaje' %}I:{{r.cant_izq or 0}}|D:{{r.cant_der or 0}}
-                        {% elif r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}} (P:{{r.pulso or '-'}})
+                        {% if r.tipo == 'drenaje' %}{{r.cant_izq or 0}}|{{r.cant_der or 0}}
+                        {% elif r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}}
+                        {% elif r.tipo == 'oxigeno' %}{{r.oxigeno}}%
+                        {% elif r.tipo == 'temperatura' %}{{r.temperatura}}°
                         {% else %}{{r.glucosa}}mg{% endif %}
                     </td>
-                    <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Borrar?')">🗑️</a></td>
+                    <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger">🗑️</a></td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 
-    <div class="modal fade" id="modalPDF" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title">Seleccionar Tipo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-          <div class="modal-body p-4">
-            <button onclick="generar('todos')" class="btn btn-outline-dark w-100 mb-2 p-3 text-start">📊 Todo el Historial</button>
-            <button onclick="generar('drenaje')" class="btn btn-outline-primary w-100 mb-2 p-3 text-start">💧 Solo Drenaje</button>
-            <button onclick="generar('presion')" class="btn btn-outline-danger w-100 mb-2 p-3 text-start">❤️ Solo Presión</button>
-            <button onclick="generar('glucosa')" class="btn btn-outline-success w-100 p-3 text-start">🩸 Solo Glucosa</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <script>
-        let diasSeleccionados = 7;
-        const modal = new bootstrap.Modal(document.getElementById('modalPDF'));
-        function abrirOpciones(dias) { diasSeleccionados = dias; modal.show(); }
-        function generar(tipo) { window.location.href = `/reporte-pdf?dias=${diasSeleccionados}&tipo=${tipo}`; modal.hide(); }
-
-        const optBase = { 
-            responsive: true, 
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
-        };
-
-        // DRENAJE
-        new Chart(document.getElementById('chartDrenaje'), {
-            type: 'line',
-            data: {
-                labels: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}"{{r.fecha}}",{% endif %}{% endfor %}],
-                datasets: [
-                    { label: 'Izq', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_izq or 0}},{% endif %}{% endfor %}], borderColor: '#0d6efd', tension: 0.3 },
-                    { label: 'Der', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_der or 0}},{% endif %}{% endfor %}], borderColor: '#6c757d', tension: 0.3 }
-                ]
-            }, options: optBase
-        });
-
-        // PRESIÓN CON DOBLE EJE Y PULSO
+        const opt = { responsive: true, maintainAspectRatio: false };
+        
+        // Gráfico Presión/Pulso (Doble Eje)
         new Chart(document.getElementById('chartPresion'), {
             type: 'line',
             data: {
                 labels: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}"{{r.fecha}}",{% endif %}{% endfor %}],
                 datasets: [
-                    { 
-                        label: 'Alta', 
-                        data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_alta or 'null'}},{% endif %}{% endfor %}], 
-                        borderColor: '#dc3545', backgroundColor: '#dc3545', yAxisID: 'y', tension: 0.2
-                    },
-                    { 
-                        label: 'Baja', 
-                        data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_baja or 'null'}},{% endif %}{% endfor %}], 
-                        borderColor: '#0d6efd', backgroundColor: '#0d6efd', yAxisID: 'y', tension: 0.2
-                    },
-                    { 
-                        label: 'Pulso (Der)', 
-                        data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.pulso or 'null'}},{% endif %}{% endfor %}], 
-                        borderColor: '#fd7e14', // Naranja
-                        backgroundColor: '#fd7e14',
-                        borderDash: [5, 5], 
-                        pointRadius: 4,
-                        yAxisID: 'y1', 
-                        tension: 0.2
-                    }
+                    { label: 'Alta', data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_alta or 'null'}},{% endif %}{% endfor %}], borderColor: '#dc3545', yAxisID: 'y' },
+                    { label: 'Baja', data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_baja or 'null'}},{% endif %}{% endfor %}], borderColor: '#0d6efd', yAxisID: 'y' },
+                    { label: 'Pulso', data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.pulso or 'null'}},{% endif %}{% endfor %}], borderColor: '#fd7e14', borderDash: [5,5], yAxisID: 'y1' }
                 ]
-            }, options: {
-                ...optBase,
-                scales: {
-                    y: { 
-                        type: 'linear', position: 'left', 
-                        title: { display: true, text: 'mmHg', font: { size: 10 } },
-                        suggestedMin: 40 
-                    },
-                    y1: { 
-                        type: 'linear', position: 'right', 
-                        title: { display: true, text: 'BPM', font: { size: 10 } },
-                        grid: { drawOnChartArea: false },
-                        suggestedMin: 40, suggestedMax: 120
-                    }
-                }
-            }
+            },
+            options: { ...opt, scales: { y: {position: 'left'}, y1: {position: 'right', grid: {drawOnChartArea: false}, suggestedMin: 40} } }
         });
 
-        // GLUCOSA
-        new Chart(document.getElementById('chartGlucosa'), {
+        // Gráfico Oxigeno y Temperatura (Doble Eje)
+        new Chart(document.getElementById('chartOxigeno'), {
             type: 'line',
             data: {
-                labels: [{% for r in registros|reverse %}{% if r.tipo == 'glucosa' %}"{{r.fecha}}",{% endif %}{% endfor %}],
-                datasets: [{ label: 'Glucosa', data: [{% for r in registros|reverse %}{% if r.tipo == 'glucosa' %}{{r.glucosa or 0}},{% endif %}{% endfor %}], borderColor: '#198754', tension: 0.3 }]
-            }, options: optBase
+                labels: [{% for r in registros|reverse %}{% if r.tipo in ['oxigeno', 'temperatura'] %}"{{r.fecha}}",{% endif %}{% endfor %}],
+                datasets: [
+                    { label: 'O2 %', data: [{% for r in registros|reverse %}{% if r.tipo == 'oxigeno' %}{{r.oxigeno}},{% elif r.tipo == 'temperatura' %}null{% endif %}{% endfor %}], borderColor: '#198754', yAxisID: 'y' },
+                    { label: 'Temp °C', data: [{% for r in registros|reverse %}{% if r.tipo == 'temperatura' %}{{r.temperatura}},{% elif r.tipo == 'oxigeno' %}null{% endif %}{% endfor %}], borderColor: '#6f42c1', yAxisID: 'y1' }
+                ]
+            },
+            options: { ...opt, scales: { y: {position: 'left', suggestedMin: 90}, y1: {position: 'right', grid: {drawOnChartArea: false}, suggestedMin: 35} } }
+        });
+        
+        // Gráfico Drenaje (se mantiene igual)
+        new Chart(document.getElementById('chartDrenaje'), {
+            type: 'line',
+            data: {
+                labels: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}"{{r.fecha}}",{% endif %}{% endfor %}],
+                datasets: [
+                    { label: 'I', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_izq or 0}},{% endif %}{% endfor %}], borderColor: '#0d6efd' },
+                    { label: 'D', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_der or 0}},{% endif %}{% endfor %}], borderColor: '#6c757d' }
+                ]
+            }, options: opt
         });
     </script>
     {% endif %}
 </div>
-
-<script>
-    function mostrarCampos() {
-        const t = document.getElementById('tipo_registro').value;
-        document.getElementById('campos_drenaje').classList.toggle('seccion-oculta', t !== 'drenaje');
-        document.getElementById('campos_presion').classList.toggle('seccion-oculta', t !== 'presion');
-        document.getElementById('campos_glucosa').classList.toggle('seccion-oculta', t !== 'glucosa');
-    }
-</script>
 </body>
 </html>
