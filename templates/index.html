@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -13,7 +13,7 @@
         .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border:none; }
         .seccion-oculta { display: none; }
         .btn-reporte { font-weight: bold; border-radius: 10px; padding: 12px; }
-        canvas { max-height: 250px; width: 100% !important; }
+        canvas { max-height: 230px; width: 100% !important; }
     </style>
 </head>
 <body>
@@ -32,7 +32,7 @@
     </div>
 
     {% if modo == 'cargar' %}
-    <div class="card p-4">
+    <div class="card p-4 shadow">
         <h4 class="text-center mb-3">Nuevo Registro</h4>
         {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
         <form action="{{ url_for('cargar_registro') }}" method="POST">
@@ -79,24 +79,15 @@
     <div class="card p-3 text-center border-primary shadow-sm mb-4">
         <h6 class="mb-3 text-primary">📄 Descargar Reporte PDF</h6>
         <div class="row g-2">
-            <div class="col-4"><button onclick="abrirOpciones(7)" class="btn btn-primary w-100 btn-reporte">7 días</button></div>
-            <div class="col-4"><button onclick="abrirOpciones(15)" class="btn btn-primary w-100 btn-reporte">15 días</button></div>
-            <div class="col-4"><button onclick="abrirOpciones(30)" class="btn btn-primary w-100 btn-reporte">30 días</button></div>
+            <div class="col-4"><button onclick="abrirOpciones(7)" class="btn btn-primary w-100 btn-reporte btn-sm">7 días</button></div>
+            <div class="col-4"><button onclick="abrirOpciones(15)" class="btn btn-primary w-100 btn-reporte btn-sm">15 días</button></div>
+            <div class="col-4"><button onclick="abrirOpciones(30)" class="btn btn-primary w-100 btn-reporte btn-sm">30 días</button></div>
         </div>
     </div>
 
-    <div class="card p-3">
-        <h6 class="text-center text-primary">Drenaje (ml)</h6>
-        <canvas id="chartDrenaje"></canvas>
-    </div>
-    <div class="card p-3">
-        <h6 class="text-center text-danger">Presión Arterial</h6>
-        <canvas id="chartPresion"></canvas>
-    </div>
-    <div class="card p-3">
-        <h6 class="text-center text-success">Glucosa (mg/dL)</h6>
-        <canvas id="chartGlucosa"></canvas>
-    </div>
+    <div class="card p-2 mb-3"><h6 class="text-center text-primary small">Drenaje (ml)</h6><canvas id="chartDrenaje"></canvas></div>
+    <div class="card p-2 mb-3"><h6 class="text-center text-danger small">Presión Arterial</h6><canvas id="chartPresion"></canvas></div>
+    <div class="card p-2 mb-3"><h6 class="text-center text-success small">Glucosa (mg/dL)</h6><canvas id="chartGlucosa"></canvas></div>
 
     <div class="table-responsive mt-4">
         <table class="table table-sm table-hover bg-white rounded shadow-sm">
@@ -121,11 +112,11 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Reporte para <span id="dias_span"></span> días</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <h5 class="modal-title">Reporte <span id="dias_span"></span> días</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body p-4">
-            <button onclick="generar('todos')" class="btn btn-outline-dark w-100 mb-2 p-3 text-start">📊 Todo el historial</button>
+            <button onclick="generar('todos')" class="btn btn-outline-dark w-100 mb-2 p-3 text-start">📊 Todo</button>
             <button onclick="generar('drenaje')" class="btn btn-outline-primary w-100 mb-2 p-3 text-start">💧 Solo Drenaje</button>
             <button onclick="generar('presion')" class="btn btn-outline-danger w-100 mb-2 p-3 text-start">❤️ Solo Presión</button>
             <button onclick="generar('glucosa')" class="btn btn-outline-success w-100 p-3 text-start">🩸 Solo Glucosa</button>
@@ -137,22 +128,17 @@
     <script>
         let diasSeleccionados = 7;
         const modal = new bootstrap.Modal(document.getElementById('modalPDF'));
-
         function abrirOpciones(dias) {
             diasSeleccionados = dias;
             document.getElementById('dias_span').innerText = dias;
             modal.show();
         }
-
         function generar(tipo) {
             window.location.href = `/reporte-pdf?dias=${diasSeleccionados}&tipo=${tipo}`;
             modal.hide();
         }
 
-        // Lógica de Gráficos
-        const labels = [{% for r in registros|reverse %}"{{r.fecha}}",{% endif %}];
-
-        // Chart Drenaje
+        // Lógica de Gráficos corregida
         new Chart(document.getElementById('chartDrenaje'), {
             type: 'line',
             data: {
@@ -164,7 +150,6 @@
             }
         });
 
-        // Chart Presión
         new Chart(document.getElementById('chartPresion'), {
             type: 'line',
             data: {
@@ -176,7 +161,6 @@
             }
         });
 
-        // Chart Glucosa
         new Chart(document.getElementById('chartGlucosa'), {
             type: 'line',
             data: {
@@ -184,7 +168,7 @@
                 datasets: [{
                     label: 'mg/dL',
                     data: [{% for r in registros|reverse %}{% if r.tipo == 'glucosa' %}{{r.glucosa or 0}},{% endif %}{% endfor %}],
-                    borderColor: '#198754', backgroundColor: 'rgba(25,135,84,0.1)', fill: true
+                    borderColor: '#198754', fill: true, backgroundColor: 'rgba(25,135,84,0.1)'
                 }]
             }
         });
