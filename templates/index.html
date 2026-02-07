@@ -11,7 +11,7 @@
         body { background-color: #f4f7f6; font-family: sans-serif; }
         .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border:none; }
         .seccion-oculta { display: none; }
-        canvas { max-height: 220px; width: 100% !important; }
+        canvas { max-height: 280px; width: 100% !important; }
         .nav-link { font-weight: bold; }
     </style>
 </head>
@@ -75,9 +75,9 @@
                     <div class="col-6"><input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="Der (ml)"></div>
                 </div>
                 <div id="campos_presion" class="row g-2 mt-1 seccion-oculta">
-                    <div class="col-4"><input type="number" name="presion_alta" class="form-control" placeholder="Alta"></div>
-                    <div class="col-4"><input type="number" name="presion_baja" class="form-control" placeholder="Baja"></div>
-                    <div class="col-4"><input type="number" name="pulso" class="form-control" placeholder="Pulso"></div>
+                    <div class="col-4"><label class="small">Alta</label><input type="number" name="presion_alta" class="form-control" placeholder="120"></div>
+                    <div class="col-4"><label class="small">Baja</label><input type="number" name="presion_baja" class="form-control" placeholder="80"></div>
+                    <div class="col-4"><label class="small">Pulso</label><input type="number" name="pulso" class="form-control" placeholder="70"></div>
                 </div>
                 <div id="campos_glucosa" class="row g-2 mt-1 seccion-oculta">
                     <div class="col-12"><input type="number" name="glucosa" class="form-control" placeholder="Glucosa (mg/dL)"></div>
@@ -95,7 +95,7 @@
 
     {% if modo == 'ver' %}
     <div class="card p-3 text-center border-primary shadow-sm mb-4">
-        <h6 class="mb-3 text-primary">📄 Descargar Reporte PDF</h6>
+        <h6 class="mb-3 text-primary">📄 Reporte PDF (Descarga Directa)</h6>
         <div class="row g-2">
             <div class="col-4"><button onclick="abrirOpciones(7)" class="btn btn-primary w-100 btn-sm">7 días</button></div>
             <div class="col-4"><button onclick="abrirOpciones(15)" class="btn btn-primary w-100 btn-sm">15 días</button></div>
@@ -103,9 +103,20 @@
         </div>
     </div>
 
-    <div class="card p-2 mb-3"><canvas id="chartDrenaje"></canvas></div>
-    <div class="card p-2 mb-3"><canvas id="chartPresion"></canvas></div>
-    <div class="card p-2 mb-3"><canvas id="chartGlucosa"></canvas></div>
+    <div class="card p-2 mb-3">
+        <h6 class="text-center text-muted small">Control de Drenaje (ml)</h6>
+        <canvas id="chartDrenaje"></canvas>
+    </div>
+    
+    <div class="card p-2 mb-3">
+        <h6 class="text-center text-muted small">Presión Arterial vs Pulso</h6>
+        <canvas id="chartPresion"></canvas>
+    </div>
+
+    <div class="card p-2 mb-3">
+        <h6 class="text-center text-muted small">Niveles de Glucosa</h6>
+        <canvas id="chartGlucosa"></canvas>
+    </div>
 
     <div class="table-responsive">
         <table class="table table-sm table-hover bg-white rounded">
@@ -116,7 +127,7 @@
                     <td><small>{{r.fecha}}</small></td>
                     <td>
                         {% if r.tipo == 'drenaje' %}I:{{r.cant_izq or 0}}|D:{{r.cant_der or 0}}
-                        {% elif r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}}
+                        {% elif r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}} (P:{{r.pulso or '-'}})
                         {% else %}{{r.glucosa}}mg{% endif %}
                     </td>
                     <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Borrar?')">🗑️</a></td>
@@ -129,9 +140,9 @@
     <div class="modal fade" id="modalPDF" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title">Reporte PDF</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-header"><h5 class="modal-title">Seleccionar Tipo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
           <div class="modal-body p-4">
-            <button onclick="generar('todos')" class="btn btn-outline-dark w-100 mb-2 p-3 text-start">📊 Todo</button>
+            <button onclick="generar('todos')" class="btn btn-outline-dark w-100 mb-2 p-3 text-start">📊 Todo el Historial</button>
             <button onclick="generar('drenaje')" class="btn btn-outline-primary w-100 mb-2 p-3 text-start">💧 Solo Drenaje</button>
             <button onclick="generar('presion')" class="btn btn-outline-danger w-100 mb-2 p-3 text-start">❤️ Solo Presión</button>
             <button onclick="generar('glucosa')" class="btn btn-outline-success w-100 p-3 text-start">🩸 Solo Glucosa</button>
@@ -146,39 +157,76 @@
         function abrirOpciones(dias) { diasSeleccionados = dias; modal.show(); }
         function generar(tipo) { window.location.href = `/reporte-pdf?dias=${diasSeleccionados}&tipo=${tipo}`; modal.hide(); }
 
-        const opt = { responsive: true, maintainAspectRatio: false };
+        const optBase = { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+        };
+
+        // DRENAJE
         new Chart(document.getElementById('chartDrenaje'), {
             type: 'line',
             data: {
                 labels: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}"{{r.fecha}}",{% endif %}{% endfor %}],
                 datasets: [
-                    { label: 'Izq', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_izq or 0}},{% endif %}{% endfor %}], borderColor: '#0d6efd' },
-                    { label: 'Der', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_der or 0}},{% endif %}{% endfor %}], borderColor: '#6c757d' }
+                    { label: 'Izq', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_izq or 0}},{% endif %}{% endfor %}], borderColor: '#0d6efd', tension: 0.3 },
+                    { label: 'Der', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_der or 0}},{% endif %}{% endfor %}], borderColor: '#6c757d', tension: 0.3 }
                 ]
-            }, options: opt
+            }, options: optBase
         });
 
+        // PRESIÓN CON DOBLE EJE Y PULSO
         new Chart(document.getElementById('chartPresion'), {
             type: 'line',
             data: {
                 labels: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}"{{r.fecha}}",{% endif %}{% endfor %}],
                 datasets: [
-                    { label: 'Alta', data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_alta or 0}},{% endif %}{% endfor %}], borderColor: '#dc3545' },
-                    { label: 'Baja', data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_baja or 0}},{% endif %}{% endfor %}], borderColor: '#0d6efd' }
+                    { 
+                        label: 'Alta', 
+                        data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_alta or 'null'}},{% endif %}{% endfor %}], 
+                        borderColor: '#dc3545', backgroundColor: '#dc3545', yAxisID: 'y', tension: 0.2
+                    },
+                    { 
+                        label: 'Baja', 
+                        data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_baja or 'null'}},{% endif %}{% endfor %}], 
+                        borderColor: '#0d6efd', backgroundColor: '#0d6efd', yAxisID: 'y', tension: 0.2
+                    },
+                    { 
+                        label: 'Pulso (Der)', 
+                        data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.pulso or 'null'}},{% endif %}{% endfor %}], 
+                        borderColor: '#fd7e14', // Naranja
+                        backgroundColor: '#fd7e14',
+                        borderDash: [5, 5], 
+                        pointRadius: 4,
+                        yAxisID: 'y1', 
+                        tension: 0.2
+                    }
                 ]
-            }, options: opt
+            }, options: {
+                ...optBase,
+                scales: {
+                    y: { 
+                        type: 'linear', position: 'left', 
+                        title: { display: true, text: 'mmHg', font: { size: 10 } },
+                        suggestedMin: 40 
+                    },
+                    y1: { 
+                        type: 'linear', position: 'right', 
+                        title: { display: true, text: 'BPM', font: { size: 10 } },
+                        grid: { drawOnChartArea: false },
+                        suggestedMin: 40, suggestedMax: 120
+                    }
+                }
+            }
         });
 
+        // GLUCOSA
         new Chart(document.getElementById('chartGlucosa'), {
             type: 'line',
             data: {
                 labels: [{% for r in registros|reverse %}{% if r.tipo == 'glucosa' %}"{{r.fecha}}",{% endif %}{% endfor %}],
-                datasets: [{
-                    label: 'mg/dL',
-                    data: [{% for r in registros|reverse %}{% if r.tipo == 'glucosa' %}{{r.glucosa or 0}},{% endif %}{% endfor %}],
-                    borderColor: '#198754'
-                }]
-            }, options: opt
+                datasets: [{ label: 'Glucosa', data: [{% for r in registros|reverse %}{% if r.tipo == 'glucosa' %}{{r.glucosa or 0}},{% endif %}{% endfor %}], borderColor: '#198754', tension: 0.3 }]
+            }, options: optBase
         });
     </script>
     {% endif %}
