@@ -20,18 +20,14 @@ def conectar():
         url = url.replace("postgres://", "postgresql://", 1)
     return psycopg2.connect(url, sslmode='require')
 
-# --- ESTO RECONSTRUYE TU APP SI BORRASTE LA BD ---
 def inicializar_sistema():
     try:
         conn = conectar(); cur = conn.cursor()
-        # Tabla Usuarios
         cur.execute("CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, usuario VARCHAR(50) UNIQUE, password TEXT);")
-        # Tabla Perfil (Ficha Médica)
         cur.execute("""CREATE TABLE IF NOT EXISTS perfil (
             id SERIAL PRIMARY KEY, usuario VARCHAR(50) UNIQUE, nombre_apellido VARCHAR(100),
             edad INTEGER, sexo VARCHAR(20), peso DECIMAL(5,2), nombre_medico VARCHAR(100), obra_social VARCHAR(100)
         );""")
-        # Tabla Registros
         cur.execute("""CREATE TABLE IF NOT EXISTS registros (
             id SERIAL PRIMARY KEY, fecha DATE, hora TIME, tipo VARCHAR(50), 
             cant_izq DECIMAL(5,2), cant_der DECIMAL(5,2), presion_alta INTEGER, 
@@ -134,18 +130,36 @@ def descargar_pdf():
     cur.execute(query + " ORDER BY fecha DESC", params)
     regs = cur.fetchall(); cur.close(); conn.close()
     buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=letter)
-    c.drawString(50, 750, "FICHA MÉDICA")
-    if p: c.drawString(50, 730, f"Paciente: {p['nombre_apellido']} | OS: {p['obra_social']}")
-    y = 700
+    
+    # Encabezado Ficha
+    c.setFont("Helvetica-Bold", 14); c.drawString(50, 760, "REPORTE DE SALUD - FICHA MÉDICA")
+    c.setFont("Helvetica", 10)
+    if p:
+        c.drawString(50, 740, f"Paciente: {p['nombre_apellido']} | Edad: {p['edad']} | Sexo: {p['sexo']}")
+        c.drawString(50, 725, f"Obra Social: {p['obra_social']} | Médico: {p['nombre_medico']}")
+    c.line(50, 715, 550, 715)
+    
+    y = 690
     for r in regs:
-        c.drawString(50, y, f"{r['fecha']} - {r['tipo']}: {r['glucosa'] or r['cant_izq'] or r['presion_alta']}")
+        if y < 50: c.showPage(); y = 750
+        txt = f"[{r['fecha']}] {r['tipo'].upper()}: "
+        if r['tipo'] == 'drenaje': txt += f"I:{r['cant_izq']}ml D:{r['cant_der']}ml"
+        elif r['tipo'] == 'presion': txt += f"P:{r['presion_alta']}/{r['presion_baja']} Pulso:{r['pulso']}"
+        else: txt += f"G:{r['glucosa']}mg/dL"
+        c.drawString(50, y, txt)
         y -= 20
+        
     c.save(); buf.seek(0)
-    resp = make_response(buf.read()); resp.headers['Content-Type'] = 'application/pdf'
+    resp = make_response(buf.read())
+    resp.headers['Content-Type'] = 'application/pdf'
+    # Forzar descarga
+    fecha_str = datetime.now().strftime("%d-%m-%Y")
+    resp.headers['Content-Disposition'] = f'attachment; filename=Reporte_Mauro_{fecha_str}.pdf'
     return resp
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
+    if "usuario" not in session: return redirect(url_for("login"))
     conn = conectar(); cur = conn.cursor()
     cur.execute("DELETE FROM registros WHERE id = %s AND usuario = %s", (id, session["usuario"]))
     conn.commit(); cur.close(); conn.close()
