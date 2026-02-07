@@ -1,12 +1,15 @@
 import os
 import psycopg2
 from psycopg2.extras import DictCursor
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "clave-segura-mauro-2026")
+app.secret_key = os.environ.get("SECRET_KEY", "mauro-salud-2026-seguro")
 app.permanent_session_lifetime = timedelta(days=7)
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -90,17 +93,13 @@ def cargar_registro():
 def ver_registros():
     if "usuario" not in session: return redirect(url_for("login"))
     conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
-    
     cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
     perfil = cur.fetchone()
-    
     cur.execute("SELECT * FROM registros WHERE usuario = %s ORDER BY fecha DESC, hora DESC LIMIT 50", (session["usuario"],))
     regs = cur.fetchall()
-    
     hace_30 = datetime.now() - timedelta(days=30)
     cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s", (session["usuario"], hace_30.date()))
     r_stats = cur.fetchall()
-    
     stats = {
         'glucosa': {'prom':0, 'max':0, 'min':999, 'alertas':0, 'count':0},
         'presion': {'prom_a':0, 'prom_b':0, 'max_a':0, 'min_a':999, 'alertas':0, 'count':0},
@@ -108,7 +107,6 @@ def ver_registros():
         'temp': {'prom':0, 'max':0, 'alertas':0, 'count':0},
         'peso_actual': perfil['peso'] if perfil and perfil['peso'] else 0
     }
-    
     for r in r_stats:
         if r['tipo'] == 'glucosa' and r['glucosa']:
             v = r['glucosa']; stats['glucosa']['count'] += 1; stats['glucosa']['prom'] += v
@@ -132,8 +130,7 @@ def ver_registros():
 
     if stats['glucosa']['count'] > 0: stats['glucosa']['prom'] //= stats['glucosa']['count']
     if stats['presion']['count'] > 0:
-        stats['presion']['prom_a'] //= stats['presion']['count']
-        stats['presion']['prom_b'] //= stats['presion']['count']
+        stats['presion']['prom_a'] //= stats['presion']['count']; stats['presion']['prom_b'] //= stats['presion']['count']
     if stats['oxigeno']['count'] > 0: stats['oxigeno']['prom'] //= stats['oxigeno']['count']
     if stats['temp']['count'] > 0: stats['temp']['prom'] = round(stats['temp']['prom'] / stats['temp']['count'], 1)
 
@@ -156,6 +153,58 @@ def editar_perfil():
     perfil = cur.fetchone()
     cur.close(); conn.close()
     return render_template("index.html", modo="perfil", perfil=perfil, usuario=session["usuario"])
+
+@app.route("/descargar-pdf", methods=["POST"])
+def descargar_pdf():
+    if "usuario" not in session: return redirect(url_for("login"))
+    tipo = request.form.get("tipo_reporte")
+    dias = int(request.form.get("periodo", 7))
+    fecha_limite = datetime.now() - timedelta(days=dias)
+    conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
+    cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
+    perfil = cur.fetchone()
+    query = "SELECT * FROM registros WHERE usuario = %s AND fecha >= %s"
+    params = [session["usuario"], fecha_limite.date()]
+    if tipo != "todos":
+        query += " AND tipo = %s"
+        params.append(tipo)
+    query += " ORDER BY fecha DESC, hora DESC"
+    cur.execute(query, tuple(params))
+    regs = cur.fetchall()
+    cur.close(); conn.close()
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    width, height = A4
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, height - 50, f"Reporte de Salud: {tipo.upper()}")
+    c.setFont("Helvetica", 10)
+    c.drawString(50, height - 70, f"Paciente: {perfil['nombre_apellido'] if perfil else session['usuario']}")
+    c.drawString(50, height - 85, f"Periodo: {dias} días | Generado: {datetime.now().strftime('%d/%m/%Y')}")
+    c.line(50, height - 95, 550, height - 95)
+    y = height - 120
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(50, y, "FECHA/HORA")
+    c.drawString(150, y, "TIPO")
+    c.drawString(220, y, "VALORES")
+    y -= 20
+    c.setFont("Helvetica", 9)
+    for r in regs:
+        if y < 50: c.showPage(); y = height - 50
+        c.drawString(50, y, f"{r['fecha']} {str(r['hora'])[:5]}")
+        c.drawString(150, y, r['tipo'].upper())
+        val = ""
+        if r['tipo'] == 'presion': val = f"{r['presion_alta']}/{r['presion_baja']} - Pulso: {r['pulso']}"
+        elif r['tipo'] == 'glucosa': val = f"{r['glucosa']} mg/dL"
+        elif r['tipo'] == 'oxigeno': val = f"{r['oxigeno']}%"
+        elif r['tipo'] == 'temperatura': val = f"{r['temperatura']} °C"
+        elif r['tipo'] == 'drenaje': val = f"I: {r['cant_izq']}ml | D: {r['cant_der']}ml"
+        c.drawString(220, y, val)
+        y -= 20
+    c.save(); buf.seek(0)
+    response = make_response(buf.read())
+    response.headers['Content-Disposition'] = f"attachment; filename=Reporte_{tipo}.pdf"
+    response.headers['Content-Type'] = 'application/pdf'
+    return response
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
