@@ -3,143 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salud - Mauro</title>
+    <title>Mauro Salud</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #f4f7f6; font-family: sans-serif; }
-        .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border:none; }
+        body { background-color: #f0f2f5; font-family: -apple-system, sans-serif; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .stat-val { font-size: 1.8rem; font-weight: bold; color: #1a1a1a; }
+        .stat-label { font-size: 0.8rem; text-transform: uppercase; color: #6c757d; font-weight: 600; }
+        .badge-alert { background-color: #ffe5e5; color: #d90429; font-weight: bold; }
         .seccion-oculta { display: none; }
-        canvas { max-height: 250px; width: 100% !important; }
-        h6 { font-weight: bold; color: #444; }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+<nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
     <div class="container">
-        <span class="navbar-brand">Mauro Salud</span>
-        <div class="ms-auto">
-            <a class="nav-link text-white d-inline me-3" href="{{ url_for('editar_perfil') }}">👤 Mi Ficha</a>
-            <a class="nav-link text-white d-inline" href="{{ url_for('logout') }}">Salir</a>
+        <span class="navbar-brand fw-bold">Mauro Salud</span>
+        <div>
+            <a href="{{ url_for('editar_perfil') }}" class="btn btn-sm btn-outline-light">Perfil</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Salir</a>
         </div>
     </div>
 </nav>
 
-<div class="container">
-    <div class="btn-group w-100 mb-4">
-        <a href="{{ url_for('cargar_registro') }}" class="btn btn-primary">Cargar Datos</a>
-        <a href="{{ url_for('ver_registros') }}" class="btn btn-outline-primary">Ver Historial</a>
+<div class="container pb-5">
+    <div class="btn-group w-100 mb-4 shadow-sm">
+        <a href="{{ url_for('cargar_registro') }}" class="btn btn-white py-2 {% if modo=='cargar' %}active btn-primary text-white{% endif %}">➕ Cargar</a>
+        <a href="{{ url_for('ver_registros') }}" class="btn btn-white py-2 {% if modo=='ver' %}active btn-primary text-white{% endif %}">📊 Indicadores</a>
     </div>
 
     {% if modo == 'cargar' %}
     <div class="card p-4">
-        <h4 class="text-center mb-3">Nuevo Registro</h4>
-        {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+        <h5 class="mb-4">Nuevo Registro</h5>
         <form action="{{ url_for('cargar_registro') }}" method="POST">
             <div class="row g-3">
-                <div class="col-6"><label>Fecha</label><input type="date" name="fecha" class="form-control" required id="f_input"></div>
-                <div class="col-6"><label>Hora</label><input type="time" name="hora" class="form-control" required id="h_input"></div>
+                <div class="col-6"><label class="small fw-bold">Fecha</label><input type="date" name="fecha" class="form-control" required id="f_input"></div>
+                <div class="col-6"><label class="small fw-bold">Hora</label><input type="time" name="hora" class="form-control" required id="h_input"></div>
                 <div class="col-12">
                     <select class="form-select form-select-lg" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
-                        <option value="drenaje">💧 Drenaje</option>
-                        <option value="presion">❤️ Presión / Pulso</option>
+                        <option value="presion">❤️ Presión y Pulso</option>
                         <option value="glucosa">🩸 Glucosa</option>
+                        <option value="drenaje">💧 Drenaje</option>
                         <option value="oxigeno">🌬️ Saturación O₂</option>
                         <option value="temperatura">🌡️ Temperatura</option>
                     </select>
                 </div>
-                <div id="campos_drenaje" class="row g-2 mt-1">
-                    <div class="col-6"><input type="number" step="0.1" name="cantidad_izq" class="form-control" placeholder="Izq (ml)"></div>
-                    <div class="col-6"><input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="Der (ml)"></div>
-                </div>
-                <div id="campos_presion" class="row g-2 mt-1 seccion-oculta">
+                <div id="campos_presion" class="row g-2 mt-1">
                     <div class="col-4"><input type="number" name="presion_alta" class="form-control" placeholder="Alta"></div>
                     <div class="col-4"><input type="number" name="presion_baja" class="form-control" placeholder="Baja"></div>
                     <div class="col-4"><input type="number" name="pulso" class="form-control" placeholder="Pulso"></div>
                 </div>
-                <div id="campos_glucosa" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" name="glucosa" class="form-control" placeholder="Glucosa mg/dL"></div></div>
-                <div id="campos_oxigeno" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" name="oxigeno" class="form-control" placeholder="Saturación %"></div></div>
-                <div id="campos_temperatura" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" step="0.1" name="temperatura" class="form-control" placeholder="Temperatura °C"></div></div>
-                <div class="col-12"><textarea name="observaciones" class="form-control" rows="2" placeholder="Observaciones..."></textarea></div>
-                <button type="submit" class="btn btn-success w-100 p-3 fw-bold mt-3">GUARDAR</button>
+                <div id="campos_glucosa" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" name="glucosa" class="form-control" placeholder="mg/dL"></div></div>
+                <div id="campos_drenaje" class="row g-2 mt-1 seccion-oculta">
+                    <div class="col-6"><input type="number" step="0.1" name="cantidad_izq" class="form-control" placeholder="Izq (ml)"></div>
+                    <div class="col-6"><input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="Der (ml)"></div>
+                </div>
+                <div id="campos_oxigeno" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" name="oxigeno" class="form-control" placeholder="Sat %"></div></div>
+                <div id="campos_temperatura" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" step="0.1" name="temperatura" class="form-control" placeholder="Temp °C"></div></div>
+                
+                <div class="col-12"><textarea name="observaciones" class="form-control" rows="2" placeholder="Notas..."></textarea></div>
+                <button type="submit" class="btn btn-primary w-100 p-3 fw-bold mt-3">GUARDAR DATOS</button>
             </div>
         </form>
     </div>
     <script>
         document.getElementById('f_input').valueAsDate = new Date();
         document.getElementById('h_input').value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
+        function mostrarCampos() {
+            const t = document.getElementById('tipo_registro').value;
+            ['presion','glucosa','drenaje','oxigeno','temperatura'].forEach(id => document.getElementById('campos_'+id).classList.add('seccion-oculta'));
+            document.getElementById('campos_'+t).classList.remove('seccion-oculta');
+        }
     </script>
     {% endif %}
 
     {% if modo == 'ver' %}
-    <div class="row">
-        <div class="col-12 col-md-6"><div class="card p-2"><h6>❤️ Presión y Pulso</h6><canvas id="chartPresion"></canvas></div></div>
-        <div class="col-12 col-md-6"><div class="card p-2"><h6>💧 Drenaje (ml)</h6><canvas id="chartDrenaje"></canvas></div></div>
-        <div class="col-12 col-md-6"><div class="card p-2"><h6>🌬️ O₂ y 🌡️ Temperatura</h6><canvas id="chartO2Temp"></canvas></div></div>
-        <div class="col-12 col-md-6"><div class="card p-2"><h6>🩸 Glucosa</h6><canvas id="chartGlucosa"></canvas></div></div>
+    <h6 class="stat-label mb-3">Indicadores Clave (30 días)</h6>
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6">
+            <div class="card p-3 border-start border-success border-4">
+                <div class="stat-label">Glucosa Promedio</div>
+                <div class="d-flex align-items-baseline">
+                    <span class="stat-val">{{stats.glucosa.prom}}</span>
+                    <span class="text-muted ms-2">mg/dL</span>
+                </div>
+                <div class="mt-2 d-flex justify-content-between">
+                    <small>Máx: <strong>{{stats.glucosa.max}}</strong></small>
+                    <small>Mín: <strong>{{stats.glucosa.min}}</strong></small>
+                    <span class="badge badge-alert">{{stats.glucosa.alertas}} alertas</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6">
+            <div class="card p-3 border-start border-danger border-4">
+                <div class="stat-label">Presión Promedio</div>
+                <div class="d-flex align-items-baseline">
+                    <span class="stat-val">{{stats.presion.prom_a}}/{{stats.presion.prom_b}}</span>
+                    <span class="text-muted ms-2">mmHg</span>
+                </div>
+                <div class="mt-2 d-flex justify-content-between">
+                    <small>Pulso: <strong>{{stats.pulso.prom}} bpm</strong></small>
+                    <span class="badge badge-alert">{{stats.presion.alertas}} registros altos</span>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <script>
-        const configGral = { responsive: true, maintainAspectRatio: false };
-
-        // GRÁFICO PRESIÓN
-        new Chart(document.getElementById('chartPresion'), {
-            type: 'line',
-            data: {
-                labels: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}"{{r.fecha}}",{% endif %}{% endfor %}],
-                datasets: [
-                    { label: 'Alta', data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_alta or 'null'}},{% endif %}{% endfor %}], borderColor: '#dc3545', yAxisID: 'y' },
-                    { label: 'Baja', data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.presion_baja or 'null'}},{% endif %}{% endfor %}], borderColor: '#0d6efd', yAxisID: 'y' },
-                    { label: 'Pulso', data: [{% for r in registros|reverse %}{% if r.tipo == 'presion' %}{{r.pulso or 'null'}},{% endif %}{% endfor %}], borderColor: '#fd7e14', yAxisID: 'y1', borderDash: [5,5] }
-                ]
-            }, options: { ...configGral, scales: { y: { position: 'left' }, y1: { position: 'right', grid: {drawOnChartArea:false} } } }
-        });
-
-        // GRÁFICO DRENAJE
-        new Chart(document.getElementById('chartDrenaje'), {
-            type: 'line',
-            data: {
-                labels: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}"{{r.fecha}}",{% endif %}{% endfor %}],
-                datasets: [
-                    { label: 'Izq', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_izq or 0}},{% endif %}{% endfor %}], borderColor: '#0d6efd' },
-                    { label: 'Der', data: [{% for r in registros|reverse %}{% if r.tipo == 'drenaje' %}{{r.cant_der or 0}},{% endif %}{% endfor %}], borderColor: '#6c757d' }
-                ]
-            }, options: configGral
-        });
-
-        // GRÁFICO O2 Y TEMP
-        new Chart(document.getElementById('chartO2Temp'), {
-            type: 'line',
-            data: {
-                labels: [{% for r in registros|reverse %}{% if r.tipo in ['oxigeno', 'temperatura'] %}"{{r.fecha}}",{% endif %}{% endfor %}],
-                datasets: [
-                    { label: 'O2%', data: [{% for r in registros|reverse %}{% if r.tipo == 'oxigeno' %}{{r.oxigeno or 'null'}},{% elif r.tipo == 'temperatura' %}null{% endif %}{% endfor %}], borderColor: '#198754', yAxisID: 'y' },
-                    { label: 'Temp', data: [{% for r in registros|reverse %}{% if r.tipo == 'temperatura' %}{{r.temperatura or 'null'}},{% elif r.tipo == 'oxigeno' %}null{% endif %}{% endfor %}], borderColor: '#6f42c1', yAxisID: 'y1' }
-                ]
-            }, options: { ...configGral, scales: { y: { position: 'left', suggestedMin: 90 }, y1: { position: 'right', grid: {drawOnChartArea:false}, suggestedMin: 35 } } }
-        });
-
-        // GRÁFICO GLUCOSA
-        new Chart(document.getElementById('chartGlucosa'), {
-            type: 'line',
-            data: {
-                labels: [{% for r in registros|reverse %}{% if r.tipo == 'glucosa' %}"{{r.fecha}}",{% endif %}{% endfor %}],
-                datasets: [{ label: 'mg/dL', data: [{% for r in registros|reverse %}{% if r.tipo == 'glucosa' %}{{r.glucosa or 0}},{% endif %}{% endfor %}], borderColor: '#198754' }]
-            }, options: configGral
-        });
-    </script>
+    <h6 class="stat-label mb-3">Historial Reciente</h6>
+    <div class="card overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="bg-light">
+                    <tr class="small text-muted">
+                        <th>FECHA</th>
+                        <th>TIPO</th>
+                        <th>VALOR</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody class="small">
+                    {% for r in registros %}
+                    <tr>
+                        <td>{{r.fecha}}</td>
+                        <td class="fw-bold">{{r.tipo.upper()}}</td>
+                        <td>
+                            {% if r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}}
+                            {% elif r.tipo == 'glucosa' %}{{r.glucosa}}
+                            {% elif r.tipo == 'drenaje' %}{{r.cant_izq or 0}}|{{r.cant_der or 0}}
+                            {% elif r.tipo == 'oxigeno' %}{{r.oxigeno}}%
+                            {% elif r.tipo == 'temperatura' %}{{r.temperatura}}°
+                            {% endif %}
+                        </td>
+                        <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger">🗑️</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
     {% endif %}
 </div>
-
-<script>
-    function mostrarCampos() {
-        const t = document.getElementById('tipo_registro').value;
-        const ids = ['campos_drenaje', 'campos_presion', 'campos_glucosa', 'campos_oxigeno', 'campos_temperatura'];
-        ids.forEach(id => document.getElementById(id).classList.add('seccion-oculta'));
-        document.getElementById('campos_' + t).classList.remove('seccion-oculta');
-    }
-</script>
 </body>
 </html>
