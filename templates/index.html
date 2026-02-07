@@ -9,9 +9,10 @@
         body { background-color: #f0f2f5; font-family: -apple-system, sans-serif; }
         .card { border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .stat-val { font-size: 1.8rem; font-weight: bold; color: #1a1a1a; }
-        .stat-label { font-size: 0.8rem; text-transform: uppercase; color: #6c757d; font-weight: 600; }
-        .badge-alert { background-color: #ffe5e5; color: #d90429; font-weight: bold; }
+        .stat-label { font-size: 0.75rem; text-transform: uppercase; color: #6c757d; font-weight: 700; letter-spacing: 0.5px; }
+        .badge-alert { background-color: #ffe5e5; color: #d90429; font-weight: bold; font-size: 0.7rem; }
         .seccion-oculta { display: none; }
+        .nav-link-custom { color: white; text-decoration: none; font-weight: 500; font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -20,31 +21,32 @@
     <div class="container">
         <span class="navbar-brand fw-bold">Mauro Salud</span>
         <div>
-            <a href="{{ url_for('editar_perfil') }}" class="btn btn-sm btn-outline-light">Mi Ficha</a>
-            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Salir</a>
+            <a href="{{ url_for('editar_perfil') }}" class="nav-link-custom me-3">👤 Mi Ficha</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light fw-bold">Salir</a>
         </div>
     </div>
 </nav>
 
 <div class="container pb-5">
-    <div class="btn-group w-100 mb-4 shadow-sm">
+    <div class="btn-group w-100 mb-4 shadow-sm bg-white rounded">
         <a href="{{ url_for('cargar_registro') }}" class="btn btn-white py-2 {% if modo=='cargar' %}active btn-primary text-white{% endif %}">➕ Cargar</a>
         <a href="{{ url_for('ver_registros') }}" class="btn btn-white py-2 {% if modo=='ver' %}active btn-primary text-white{% endif %}">📊 Indicadores</a>
     </div>
 
     {% if modo == 'perfil' %}
     <div class="card p-4">
-        <h5 class="mb-4">Mi Ficha Individual</h5>
-        {% if get_flashed_messages() %}<div class="alert alert-success">{{ get_flashed_messages()[0] }}</div>{% endif %}
+        <h5 class="mb-4 fw-bold text-primary">Mi Ficha Individual</h5>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}{% for category, message in messages %}<div class="alert alert-{{category}} small">{{ message }}</div>{% endfor %}{% endif %}
+        {% endwith %}
         <form action="{{ url_for('editar_perfil') }}" method="POST">
             <div class="row g-3">
-                <div class="col-12"><label class="small fw-bold">Nombre y Apellido</label><input type="text" name="nombre" class="form-control" value="{{perfil.nombre_apellido or ''}}" required></div>
-                <div class="col-6"><label class="small fw-bold">Edad</label><input type="number" name="edad" class="form-control" value="{{perfil.edad or ''}}"></div>
-                <div class="col-6"><label class="small fw-bold">Sexo</label><select name="sexo" class="form-select"><option value="M" {% if perfil.sexo=='M' %}selected{% endif %}>M</option><option value="F" {% if perfil.sexo=='F' %}selected{% endif %}>F</option></select></div>
-                <div class="col-6"><label class="small fw-bold">Peso (kg)</label><input type="number" step="0.1" name="peso" class="form-control" value="{{perfil.peso or ''}}"></div>
-                <div class="col-12"><label class="small fw-bold">Obra Social</label><input type="text" name="obra_social" class="form-control" value="{{perfil.obra_social or ''}}"></div>
-                <div class="col-12"><label class="small fw-bold">Médico de Cabecera</label><input type="text" name="medico" class="form-control" value="{{perfil.nombre_medico or ''}}"></div>
-                <button type="submit" class="btn btn-success w-100 p-3 fw-bold">ACTUALIZAR FICHA</button>
+                <div class="col-12"><label class="small fw-bold text-muted">Nombre y Apellido</label><input type="text" name="nombre" class="form-control" value="{{perfil.nombre_apellido or ''}}" required></div>
+                <div class="col-6"><label class="small fw-bold text-muted">Edad</label><input type="number" name="edad" class="form-control" value="{{perfil.edad or ''}}"></div>
+                <div class="col-6"><label class="small fw-bold text-muted">Sexo</label><select name="sexo" class="form-select"><option value="M" {% if perfil.sexo=='M' %}selected{% endif %}>M</option><option value="F" {% if perfil.sexo=='F' %}selected{% endif %}>F</option></select></div>
+                <div class="col-12"><label class="small fw-bold text-muted">Obra Social</label><input type="text" name="obra_social" class="form-control" value="{{perfil.obra_social or ''}}"></div>
+                <div class="col-12"><label class="small fw-bold text-muted">Médico de Cabecera</label><input type="text" name="medico" class="form-control" value="{{perfil.nombre_medico or ''}}"></div>
+                <button type="submit" class="btn btn-success w-100 p-3 fw-bold mt-2">ACTUALIZAR FICHA</button>
             </div>
         </form>
     </div>
@@ -52,13 +54,14 @@
 
     {% if modo == 'cargar' %}
     <div class="card p-4">
-        <h5 class="mb-4">Nuevo Registro</h5>
+        <h5 class="mb-4 fw-bold text-primary">Nuevo Registro</h5>
+        {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
         <form action="{{ url_for('cargar_registro') }}" method="POST">
             <div class="row g-3">
-                <div class="col-6"><label class="small fw-bold">Fecha</label><input type="date" name="fecha" class="form-control" required id="f_input"></div>
-                <div class="col-6"><label class="small fw-bold">Hora</label><input type="time" name="hora" class="form-control" required id="h_input"></div>
+                <div class="col-6"><label class="small fw-bold text-muted">Fecha</label><input type="date" name="fecha" class="form-control" required id="f_input"></div>
+                <div class="col-6"><label class="small fw-bold text-muted">Hora</label><input type="time" name="hora" class="form-control" required id="h_input"></div>
                 <div class="col-12">
-                    <select class="form-select form-select-lg" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
+                    <select class="form-select form-select-lg fw-bold text-primary" id="tipo_registro" name="tipo_registro" onchange="mostrarCampos()">
                         <option value="presion">❤️ Presión y Pulso</option>
                         <option value="glucosa">🩸 Glucosa</option>
                         <option value="drenaje">💧 Drenaje</option>
@@ -76,10 +79,10 @@
                     <div class="col-6"><input type="number" step="0.1" name="cantidad_izq" class="form-control" placeholder="Izq (ml)"></div>
                     <div class="col-6"><input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="Der (ml)"></div>
                 </div>
-                <div id="campos_oxigeno" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" name="oxigeno" class="form-control" placeholder="Sat %"></div></div>
-                <div id="campos_temperatura" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" step="0.1" name="temperatura" class="form-control" placeholder="Temp °C"></div></div>
-                <div class="col-12"><textarea name="observaciones" class="form-control" rows="2" placeholder="Notas..."></textarea></div>
-                <button type="submit" class="btn btn-primary w-100 p-3 fw-bold mt-3">GUARDAR DATOS</button>
+                <div id="campos_oxigeno" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" name="oxigeno" class="form-control" placeholder="Saturación %"></div></div>
+                <div id="campos_temperatura" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" step="0.1" name="temperatura" class="form-control" placeholder="Temperatura °C"></div></div>
+                <div class="col-12"><textarea name="observaciones" class="form-control" rows="2" placeholder="Observaciones opcionales..."></textarea></div>
+                <button type="submit" class="btn btn-primary w-100 p-3 fw-bold mt-3">GUARDAR EN LA NUBE</button>
             </div>
         </form>
     </div>
@@ -97,56 +100,66 @@
     {% if modo == 'ver' %}
     <h6 class="stat-label mb-3">Indicadores Clave (30 días)</h6>
     <div class="row g-3 mb-4">
-        <div class="col-12 col-md-6">
-            <div class="card p-3 border-start border-success border-4">
-                <div class="stat-label">Glucosa Promedio</div>
-                <div class="d-flex align-items-baseline">
-                    <span class="stat-val">{{stats.glucosa.prom}}</span>
-                    <span class="text-muted ms-2">mg/dL</span>
-                </div>
-                <div class="mt-2 d-flex justify-content-between">
-                    <small>Máx: <strong>{{stats.glucosa.max}}</strong></small>
-                    <small>Mín: <strong>{{stats.glucosa.min}}</strong></small>
-                    <span class="badge badge-alert">{{stats.glucosa.alertas}} alertas</span>
-                </div>
+        <div class="col-6">
+            <div class="card p-3 border-start border-danger border-4 h-100">
+                <div class="stat-label">❤️ Presión</div>
+                <div class="stat-val" style="font-size: 1.4rem;">{{stats.presion.prom_a}}/{{stats.presion.prom_b}}</div>
+                <small class="text-muted d-block">Pulso: {{stats.pulso.prom}}</small>
+                {% if stats.presion.alertas > 0 %}<span class="badge badge-alert mt-1">{{stats.presion.alertas}} altas</span>{% endif %}
             </div>
         </div>
-        <div class="col-12 col-md-6">
-            <div class="card p-3 border-start border-danger border-4">
-                <div class="stat-label">Presión Promedio</div>
-                <div class="d-flex align-items-baseline">
-                    <span class="stat-val">{{stats.presion.prom_a}}/{{stats.presion.prom_b}}</span>
-                    <span class="text-muted ms-2">mmHg</span>
-                </div>
-                <div class="mt-2 d-flex justify-content-between">
-                    <small>Pulso: <strong>{{stats.pulso.prom}} bpm</strong></small>
-                    <span class="badge badge-alert">{{stats.presion.alertas}} registros altos</span>
-                </div>
+        <div class="col-6">
+            <div class="card p-3 border-start border-success border-4 h-100">
+                <div class="stat-label">🩸 Glucosa</div>
+                <div class="stat-val" style="font-size: 1.4rem;">{{stats.glucosa.prom}}</div>
+                <small class="text-muted d-block">Máx: {{stats.glucosa.max}}</small>
+                {% if stats.glucosa.alertas > 0 %}<span class="badge badge-alert mt-1">{{stats.glucosa.alertas}} alertas</span>{% endif %}
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card p-3 border-start border-info border-4 h-100">
+                <div class="stat-label">🌬️ Oxígeno</div>
+                <div class="stat-val" style="font-size: 1.4rem;">{{stats.oxigeno.prom}}%</div>
+                <small class="text-muted d-block">Mín: {{stats.oxigeno.min}}%</small>
+                {% if stats.oxigeno.alertas > 0 %}<span class="badge badge-alert mt-1">{{stats.oxigeno.alertas}} bajas</span>{% endif %}
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card p-3 border-start border-warning border-4 h-100">
+                <div class="stat-label">🌡️ Temp</div>
+                <div class="stat-val" style="font-size: 1.4rem;">{{stats.temp.prom}}°</div>
+                <small class="text-muted d-block">Máx: {{stats.temp.max}}°</small>
+                {% if stats.temp.alertas > 0 %}<span class="badge badge-alert mt-1">{{stats.temp.alertas}} picos</span>{% endif %}
             </div>
         </div>
     </div>
 
-    <h6 class="stat-label mb-3">Historial Reciente</h6>
-    <div class="card overflow-hidden">
+    <h6 class="stat-label mb-3">Historial de Registros</h6>
+    <div class="card overflow-hidden shadow-sm">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="bg-light">
-                    <tr class="small text-muted"><th>FECHA</th><th>TIPO</th><th>VALOR</th><th></th></tr>
+                    <tr class="small text-muted" style="font-size: 0.7rem;">
+                        <th class="ps-3">FECHA/HORA</th>
+                        <th>TIPO</th>
+                        <th>VALOR</th>
+                        <th></th>
+                    </tr>
                 </thead>
                 <tbody class="small">
                     {% for r in registros %}
                     <tr>
-                        <td>{{r.fecha}}</td>
-                        <td class="fw-bold">{{r.tipo.upper()}}</td>
-                        <td>
-                            {% if r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}}
-                            {% elif r.tipo == 'glucosa' %}{{r.glucosa}}
-                            {% elif r.tipo == 'drenaje' %}{{r.cant_izq or 0}}|{{r.cant_der or 0}}
-                            {% elif r.tipo == 'oxigeno' %}{{r.oxigeno}}%
-                            {% elif r.tipo == 'temperatura' %}{{r.temperatura}}°
+                        <td class="ps-3"><div class="fw-bold">{{r.fecha}}</div><div class="text-muted" style="font-size: 0.7rem;">{{r.hora}}</div></td>
+                        <td class="align-middle fw-bold text-uppercase" style="font-size: 0.75rem;">{{r.tipo}}</td>
+                        <td class="align-middle">
+                            {% if r.tipo == 'presion' %}<span class="badge bg-danger bg-opacity-10 text-danger fw-bold">{{r.presion_alta}}/{{r.presion_baja}}</span>
+                            {% elif r.tipo == 'glucosa' %}<span class="badge bg-success bg-opacity-10 text-success fw-bold">{{r.glucosa}} mg</span>
+                            {% elif r.tipo == 'drenaje' %}<span class="text-muted">I:{{r.cant_izq or 0}}|D:{{r.cant_der or 0}}</span>
+                            {% elif r.tipo == 'oxigeno' %}<span class="fw-bold text-info">{{r.oxigeno}}%</span>
+                            {% elif r.tipo == 'temperatura' %}<span class="fw-bold text-warning">{{r.temperatura}}°C</span>
                             {% endif %}
                         </td>
-                        <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger">🗑️</a></td>
+                        <td class="align-middle text-end pe-3"><a href="{{ url_for('borrar', id=r.id) }}" class="text-decoration-none" onclick="return confirm('¿Borrar registro?')">🗑️</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
