@@ -47,11 +47,9 @@ def login():
         try:
             conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
             cur.execute("SELECT * FROM usuarios WHERE usuario = %s", (u,))
-            user = cur.fetchone()
-            cur.close(); conn.close()
+            user = cur.fetchone(); cur.close(); conn.close()
             if user and check_password_hash(user["password"], p):
-                session.permanent = True
-                session["usuario"] = u
+                session.permanent = True; session["usuario"] = u
                 return redirect(url_for("ver_registros"))
             flash("Usuario o clave incorrectos", "danger")
         except Exception as e: return f"Error: {e}", 500
@@ -100,33 +98,30 @@ def ver_registros():
     hace_30 = datetime.now() - timedelta(days=30)
     cur.execute("SELECT * FROM registros WHERE usuario = %s AND fecha >= %s", (session["usuario"], hace_30.date()))
     r_stats = cur.fetchall()
+    
     stats = {
-        'glucosa': {'prom':0, 'max':0, 'min':999, 'alertas':0, 'count':0},
-        'presion': {'prom_a':0, 'prom_b':0, 'max_a':0, 'min_a':999, 'alertas':0, 'count':0},
-        'oxigeno': {'prom':0, 'min':100, 'alertas':0, 'count':0},
-        'temp': {'prom':0, 'max':0, 'alertas':0, 'count':0},
+        'glucosa': {'prom':0, 'max':0, 'min':999, 'count':0},
+        'presion': {'prom_a':0, 'prom_b':0, 'max_a':0, 'min_a':999, 'count':0},
+        'oxigeno': {'prom':0, 'min':100, 'count':0},
+        'temp': {'prom':0, 'max':0, 'count':0},
         'peso_actual': perfil['peso'] if perfil and perfil['peso'] else 0
     }
+    
     for r in r_stats:
         if r['tipo'] == 'glucosa' and r['glucosa']:
             v = r['glucosa']; stats['glucosa']['count'] += 1; stats['glucosa']['prom'] += v
             if v > stats['glucosa']['max']: stats['glucosa']['max'] = v
             if v < stats['glucosa']['min']: stats['glucosa']['min'] = v
-            if v > 140 or v < 70: stats['glucosa']['alertas'] += 1
         elif r['tipo'] == 'presion' and r['presion_alta'] and r['presion_baja']:
-            stats['presion']['count'] += 1
-            stats['presion']['prom_a'] += r['presion_alta']; stats['presion']['prom_b'] += r['presion_baja']
+            stats['presion']['count'] += 1; stats['presion']['prom_a'] += r['presion_alta']; stats['presion']['prom_b'] += r['presion_baja']
             if r['presion_alta'] > stats['presion']['max_a']: stats['presion']['max_a'] = r['presion_alta']
             if r['presion_alta'] < stats['presion']['min_a']: stats['presion']['min_a'] = r['presion_alta']
-            if r['presion_alta'] >= 140 or r['presion_baja'] >= 90: stats['presion']['alertas'] += 1
         elif r['tipo'] == 'oxigeno' and r['oxigeno']:
             v = r['oxigeno']; stats['oxigeno']['count'] += 1; stats['oxigeno']['prom'] += v
             if v < stats['oxigeno']['min']: stats['oxigeno']['min'] = v
-            if v < 95: stats['oxigeno']['alertas'] += 1
         elif r['tipo'] == 'temperatura' and r['temperatura']:
             v = float(r['temperatura']); stats['temp']['count'] += 1; stats['temp']['prom'] += v
             if v > stats['temp']['max']: stats['temp']['max'] = v
-            if v >= 37.5: stats['temp']['alertas'] += 1
 
     if stats['glucosa']['count'] > 0: stats['glucosa']['prom'] //= stats['glucosa']['count']
     if stats['presion']['count'] > 0:
@@ -150,61 +145,42 @@ def editar_perfil():
              request.form.get("sexo"), request.form.get("peso"), request.form.get("medico"), request.form.get("obra_social")))
         conn.commit(); flash("Ficha actualizada correctamente", "success")
     cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
-    perfil = cur.fetchone()
-    cur.close(); conn.close()
+    perfil = cur.fetchone(); cur.close(); conn.close()
     return render_template("index.html", modo="perfil", perfil=perfil, usuario=session["usuario"])
 
 @app.route("/descargar-pdf", methods=["POST"])
 def descargar_pdf():
     if "usuario" not in session: return redirect(url_for("login"))
-    tipo = request.form.get("tipo_reporte")
-    dias = int(request.form.get("periodo", 7))
+    tipo = request.form.get("tipo_reporte"); dias = int(request.form.get("periodo", 7))
     fecha_limite = datetime.now() - timedelta(days=dias)
     conn = conectar(); cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("SELECT * FROM perfil WHERE usuario = %s", (session["usuario"],))
     perfil = cur.fetchone()
     query = "SELECT * FROM registros WHERE usuario = %s AND fecha >= %s"
     params = [session["usuario"], fecha_limite.date()]
-    if tipo != "todos":
-        query += " AND tipo = %s"
-        params.append(tipo)
-    query += " ORDER BY fecha DESC, hora DESC"
-    cur.execute(query, tuple(params))
-    regs = cur.fetchall()
-    cur.close(); conn.close()
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    width, height = A4
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, height - 50, f"Reporte de Salud: {tipo.upper()}")
-    c.setFont("Helvetica", 10)
-    c.drawString(50, height - 70, f"Paciente: {perfil['nombre_apellido'] if perfil else session['usuario']}")
+    if tipo != "todos": query += " AND tipo = %s"; params.append(tipo)
+    query += " ORDER BY fecha DESC, hora DESC"; cur.execute(query, tuple(params))
+    regs = cur.fetchall(); cur.close(); conn.close()
+    buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=A4); height = A4[1]
+    c.setFont("Helvetica-Bold", 16); c.drawString(50, height - 50, f"Reporte: {tipo.upper()}")
+    c.setFont("Helvetica", 10); c.drawString(50, height - 70, f"Paciente: {perfil['nombre_apellido'] if perfil else session['usuario']}")
     c.drawString(50, height - 85, f"Periodo: {dias} días | Generado: {datetime.now().strftime('%d/%m/%Y')}")
-    c.line(50, height - 95, 550, height - 95)
-    y = height - 120
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(50, y, "FECHA/HORA")
-    c.drawString(150, y, "TIPO")
-    c.drawString(220, y, "VALORES")
-    y -= 20
-    c.setFont("Helvetica", 9)
+    c.line(50, height - 95, 550, height - 95); y = height - 120
+    c.setFont("Helvetica-Bold", 9); c.drawString(50, y, "FECHA/HORA"); c.drawString(150, y, "TIPO"); c.drawString(220, y, "VALORES")
+    y -= 20; c.setFont("Helvetica", 9)
     for r in regs:
         if y < 50: c.showPage(); y = height - 50
-        c.drawString(50, y, f"{r['fecha']} {str(r['hora'])[:5]}")
-        c.drawString(150, y, r['tipo'].upper())
+        c.drawString(50, y, f"{r['fecha']} {str(r['hora'])[:5]}"); c.drawString(150, y, r['tipo'].upper())
         val = ""
         if r['tipo'] == 'presion': val = f"{r['presion_alta']}/{r['presion_baja']} - Pulso: {r['pulso']}"
         elif r['tipo'] == 'glucosa': val = f"{r['glucosa']} mg/dL"
         elif r['tipo'] == 'oxigeno': val = f"{r['oxigeno']}% Sat."
         elif r['tipo'] == 'temperatura': val = f"{r['temperatura']} °C"
         elif r['tipo'] == 'drenaje': val = f"I: {r['cant_izq']}ml | D: {r['cant_der']}ml"
-        c.drawString(220, y, val)
-        y -= 20
+        c.drawString(220, y, val); y -= 20
     c.save(); buf.seek(0)
-    response = make_response(buf.read())
-    response.headers['Content-Disposition'] = f"attachment; filename=Reporte_{tipo}.pdf"
-    response.headers['Content-Type'] = 'application/pdf'
-    return response
+    response = make_response(buf.read()); response.headers['Content-Disposition'] = f"attachment; filename=Reporte_{tipo}.pdf"
+    response.headers['Content-Type'] = 'application/pdf'; return response
 
 @app.route("/borrar/<int:id>")
 def borrar(id):
