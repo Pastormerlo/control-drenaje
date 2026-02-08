@@ -8,8 +8,9 @@
     <style>
         body { background-color: #f0f2f5; font-family: -apple-system, sans-serif; }
         .card { border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .stat-val { font-size: 1.5rem; font-weight: bold; }
+        .stat-val { font-size: 1.5rem; font-weight: bold; line-height: 1.2; }
         .stat-label { font-size: 0.65rem; text-transform: uppercase; color: #6c757d; font-weight: 700; letter-spacing: 0.5px; }
+        .stat-minmax { font-size: 0.6rem; font-weight: 600; color: #6c757d; }
         .seccion-oculta { display: none; }
         .nav-link-custom { color: white; text-decoration: none; font-size: 0.9rem; font-weight: 500; }
     </style>
@@ -65,6 +66,7 @@
                 <div id="campos_oxigeno" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" name="oxigeno" class="form-control" placeholder="Sat %"></div></div>
                 <div id="campos_temperatura" class="row g-2 mt-1 seccion-oculta"><div class="col-12"><input type="number" step="0.1" name="temperatura" class="form-control" placeholder="°C"></div></div>
                 <div id="campos_drenaje" class="row g-2 mt-1 seccion-oculta"><div class="col-6"><input type="number" step="0.1" name="cantidad_izq" class="form-control" placeholder="I (ml)"></div><div class="col-6"><input type="number" step="0.1" name="cantidad_der" class="form-control" placeholder="D (ml)"></div></div>
+                <div class="col-12"><textarea name="observaciones" class="form-control" rows="2" placeholder="Notas..."></textarea></div>
                 <button type="submit" class="btn btn-primary w-100 p-3 fw-bold mt-2">GUARDAR</button>
             </div>
         </form>
@@ -81,37 +83,48 @@
     {% endif %}
 
     {% if modo == 'ver' %}
-    <div class="card p-3 mb-3 bg-light border-0">
+    <div class="card p-3 mb-3 bg-light border-0 shadow-sm">
         <h6 class="fw-bold small mb-2">🖨️ Generar Reporte PDF</h6>
         <form action="{{ url_for('descargar_pdf') }}" method="POST" class="row g-2">
             <div class="col-6">
                 <select name="tipo_reporte" class="form-select form-select-sm">
-                    <option value="todos">Todo</option>
-                    <option value="presion">Presión</option>
-                    <option value="glucosa">Glucosa</option>
-                    <option value="oxigeno">Oxígeno</option>
-                    <option value="temperatura">Temperatura</option>
-                    <option value="drenaje">Drenajes</option>
+                    <option value="todos">Todo</option><option value="presion">Presión</option><option value="glucosa">Glucosa</option><option value="oxigeno">Oxígeno</option><option value="temperatura">Temperatura</option><option value="drenaje">Drenajes</option>
                 </select>
             </div>
             <div class="col-6"><select name="periodo" class="form-select form-select-sm"><option value="7">7 días</option><option value="15">15 días</option><option value="30" selected>30 días</option></select></div>
             <button type="submit" class="btn btn-dark w-100 btn-sm fw-bold">DESCARGAR PDF</button>
         </form>
     </div>
+    
     <div class="text-center mb-3"><span class="badge bg-secondary">⚖️ Peso: {{stats.peso_actual}} kg</span></div>
+    
     <div class="row g-2 mb-3">
-        <div class="col-6"><div class="card p-3 border-start border-danger border-4 h-100"><div class="stat-label">❤️ Presión</div><div class="stat-val text-danger">{{stats.presion.prom_a}}/{{stats.presion.prom_b}}</div></div></div>
-        <div class="col-6"><div class="card p-3 border-start border-success border-4 h-100"><div class="stat-label">🩸 Glucosa</div><div class="stat-val text-success">{{stats.glucosa.prom}}</div></div></div>
-        <div class="col-6"><div class="card p-3 border-start border-info border-4 h-100"><div class="stat-label">🌬️ Oxígeno</div><div class="stat-val text-info">{{stats.oxigeno.prom}}%</div></div></div>
-        <div class="col-6"><div class="card p-3 border-start border-warning border-4 h-100"><div class="stat-label">🌡️ Temp.</div><div class="stat-val text-warning">{{stats.temp.prom}}°</div></div></div>
+        <div class="col-6"><div class="card p-3 border-start border-danger border-4 h-100"><div class="stat-label">❤️ Presión Prom.</div><div class="stat-val text-danger">{{stats.presion.prom_a}}/{{stats.presion.prom_b}}</div><div class="stat-minmax">Máx: {{stats.presion.max_a}} | Mín: {{stats.presion.min_a}}</div></div></div>
+        <div class="col-6"><div class="card p-3 border-start border-success border-4 h-100"><div class="stat-label">🩸 Glucosa Prom.</div><div class="stat-val text-success">{{stats.glucosa.prom}}</div><div class="stat-minmax">Máx: {{stats.glucosa.max}} | Mín: {{stats.glucosa.min}}</div></div></div>
+        <div class="col-6"><div class="card p-3 border-start border-info border-4 h-100"><div class="stat-label">🌬️ Oxígeno Prom.</div><div class="stat-val text-info">{{stats.oxigeno.prom}}%</div><div class="stat-minmax">Mínimo: {{stats.oxigeno.min}}%</div></div></div>
+        <div class="col-6"><div class="card p-3 border-start border-warning border-4 h-100"><div class="stat-label">🌡️ Temp Prom.</div><div class="stat-val text-warning">{{stats.temp.prom}}°</div><div class="stat-minmax">Máxima: {{stats.temp.max}}°</div></div></div>
     </div>
-    <button class="btn btn-outline-primary w-100 py-3 fw-bold mb-3 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#boxHistorial">📂 VER HISTORIAL</button>
+
+    <button class="btn btn-outline-primary w-100 py-3 fw-bold mb-3 bg-white shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#boxHistorial">📂 VER HISTORIAL</button>
     <div class="collapse" id="boxHistorial">
-        <div class="card overflow-hidden"><div class="table-responsive"><table class="table table-hover mb-0"><tbody style="font-size: 0.8rem;">
-            {% for r in registros %}<tr><td class="ps-3"><div>{{r.fecha}}</div><div class="text-muted small">{{r.hora}}</div></td><td class="fw-bold">{{r.tipo[:4]|upper}}</td><td>
-                {% if r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}}{% elif r.tipo == 'glucosa' %}{{r.glucosa}}{% elif r.tipo == 'drenaje' %}I:{{r.cant_izq}}|D:{{r.cant_der}}{% elif r.tipo == 'oxigeno' %}{{r.oxigeno}}%{% elif r.tipo == 'temperatura' %}{{r.temperatura}}°{% endif %}
-            </td><td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Borrar registro?')">🗑️</a></td></tr>{% endfor %}
-        </tbody></table></div></div>
+        <div class="card overflow-hidden shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <tbody style="font-size: 0.8rem;">
+                    {% for r in registros %}
+                        <tr>
+                            <td class="ps-3"><div>{{r.fecha}}</div><div class="text-muted small">{{r.hora}}</div></td>
+                            <td class="fw-bold">{{r.tipo[:4]|upper}}</td>
+                            <td>
+                                {% if r.tipo == 'presion' %}{{r.presion_alta}}/{{r.presion_baja}}{% elif r.tipo == 'glucosa' %}{{r.glucosa}}{% elif r.tipo == 'drenaje' %}I:{{r.cant_izq or 0}}|D:{{r.cant_der or 0}}{% elif r.tipo == 'oxigeno' %}{{r.oxigeno}}%{% elif r.tipo == 'temperatura' %}{{r.temperatura}}°{% endif %}
+                            </td>
+                            <td><a href="{{ url_for('borrar', id=r.id) }}" class="text-danger" onclick="return confirm('¿Borrar?')">🗑️</a></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     {% endif %}
 </div>
